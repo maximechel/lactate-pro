@@ -1109,23 +1109,26 @@ async function buildPDF(cl, test) {
   doc.text(String(test.paliers.length), M+136, 71.5);
   doc.setFont(undefined,'normal');
 
-  // Charts from canvas
-  const chY = 82, chH = 105, chW2 = (CW - 5) / 2;
-
-  // Section labels
-  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
-  doc.text('COURBE LACTATE', M, chY - 2);
-  doc.text('COURBE FRÉQUENCE CARDIAQUE', M + chW2 + 5, chY - 2);
-  doc.setFont(undefined,'normal');
+  // Charts from canvas — stacked vertically
+  const chY = 82, chH = 90, chGap = 8;
 
   const lacCanvas = document.getElementById('ch-lactate');
   const fcCanvas  = document.getElementById('ch-fc');
+
+  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
+  doc.text('COURBE LACTATE', M, chY - 2);
+  doc.setFont(undefined,'normal');
   if (lacCanvas && chLactate) {
-    doc.addImage(lacCanvas.toDataURL('image/png'), 'PNG', M, chY, chW2, chH);
-  } else { pdfChartPlaceholder(doc, M, chY, chW2, chH, 'Courbe Lactate'); }
+    doc.addImage(lacCanvas.toDataURL('image/png'), 'PNG', M, chY, CW, chH);
+  } else { pdfChartPlaceholder(doc, M, chY, CW, chH, 'Courbe Lactate'); }
+
+  const chY2 = chY + chH + chGap;
+  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
+  doc.text('COURBE FRÉQUENCE CARDIAQUE', M, chY2 - 2);
+  doc.setFont(undefined,'normal');
   if (fcCanvas && chFC) {
-    doc.addImage(fcCanvas.toDataURL('image/png'), 'PNG', M+chW2+5, chY, chW2, chH);
-  } else { pdfChartPlaceholder(doc, M+chW2+5, chY, chW2, chH, 'Courbe FC'); }
+    doc.addImage(fcCanvas.toDataURL('image/png'), 'PNG', M, chY2, CW, chH);
+  } else { pdfChartPlaceholder(doc, M, chY2, CW, chH, 'Courbe FC'); }
 
   // ── PAGE 2 ──────────────────────────────────────────
   doc.addPage();
