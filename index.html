@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LactatePro — Analyse de Test d'Effort</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root {
+  --navy: #1e3a5f;
+  --blue: #2563eb;
+  --sky: #0ea5e9;
+  --green: #22c55e;
+  --red: #ef4444;
+  --orange: #f97316;
+  --yellow: #eab308;
+  --purple: #8b5cf6;
+  --pink: #ec4899;
+  --bg: #f1f5f9;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -2px rgba(0,0,0,.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -4px rgba(0,0,0,.06);
+  --radius: 10px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── TOPBAR ── */
+.topbar {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e4d8c 100%);
+  height: 64px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 1.5rem; box-shadow: var(--shadow-md); position: sticky; top: 0; z-index: 100;
+}
+.topbar-left { display: flex; align-items: center; gap: .9rem; }
+.logo-wrap { width: 42px; height: 42px; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.12); border: 1.5px dashed rgba(255,255,255,.35); cursor: pointer; transition: background .15s; flex-shrink: 0; }
+.logo-wrap:hover { background: rgba(255,255,255,.2); }
+.logo-wrap img { width: 100%; height: 100%; object-fit: contain; display: none; }
+.logo-wrap .logo-icon { font-size: 1.2rem; color: rgba(255,255,255,.7); }
+.app-name { font-size: 1.15rem; font-weight: 700; color: #fff; letter-spacing: -.02em; }
+.app-sub { font-size: .72rem; color: rgba(255,255,255,.55); margin-top: .1rem; }
+.topbar-right { display: flex; align-items: center; gap: .6rem; }
+
+/* ── BREADCRUMB ── */
+.breadcrumb { background: #fff; border-bottom: 1px solid var(--border); padding: .6rem 1.5rem; font-size: .8rem; color: var(--muted); display: flex; align-items: center; gap: .4rem; }
+.breadcrumb .bc-link { color: var(--blue); cursor: pointer; text-decoration: none; }
+.breadcrumb .bc-link:hover { text-decoration: underline; }
+.breadcrumb .sep { color: var(--border); }
+
+/* ── MAIN ── */
+.main { max-width: 1140px; margin: 0 auto; padding: 1.5rem; }
+
+/* ── BUTTONS ── */
+.btn { display: inline-flex; align-items: center; gap: .35rem; padding: .5rem 1.1rem; border-radius: 7px; font-size: .85rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; white-space: nowrap; text-decoration: none; }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--bg); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-danger:hover { background: #dc2626; }
+.btn-success { background: var(--green); color: #fff; }
+.btn-success:hover { background: #16a34a; }
+.btn-navy { background: var(--navy); color: #fff; }
+.btn-navy:hover { background: #162d4a; }
+.btn-sm { padding: .3rem .6rem; font-size: .78rem; }
+.btn-lg { padding: .65rem 1.4rem; font-size: .95rem; }
+.btn-icon { background: none; border: none; cursor: pointer; padding: .3rem; border-radius: 6px; color: var(--muted); transition: all .15s; display: inline-flex; align-items: center; }
+.btn-icon:hover { background: var(--bg); color: var(--text); }
+
+/* ── PAGE HEADER ── */
+.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: .75rem; }
+.page-header h1 { font-size: 1.4rem; font-weight: 800; color: var(--navy); letter-spacing: -.02em; }
+.page-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+
+/* ── CARDS ── */
+.card { background: var(--card); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); padding: 1.25rem; margin-bottom: 1rem; }
+.card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; padding-bottom: .75rem; border-bottom: 1px solid var(--border); }
+.card-header h2 { font-size: .92rem; font-weight: 700; color: var(--navy); letter-spacing: -.01em; }
+
+/* ── GRID ── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; }
+@media(max-width:768px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+
+/* ── FORM ── */
+.form-group { margin-bottom: .9rem; }
+.form-label { display: block; font-size: .72rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .3rem; }
+.form-control { width: 100%; padding: .5rem .75rem; border: 1.5px solid var(--border); border-radius: 7px; font-size: .88rem; color: var(--text); background: #fff; transition: border-color .15s, box-shadow .15s; }
+.form-control:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+textarea.form-control { resize: vertical; font-family: 'SF Mono','Consolas',monospace; font-size: .78rem; }
+select.form-control { cursor: pointer; }
+
+/* ── TABLES ── */
+.table-wrap { overflow-x: auto; border-radius: 8px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+thead th { background: #f8fafc; color: var(--muted); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .6rem .8rem; text-align: center; border-bottom: 1.5px solid var(--border); }
+tbody td { padding: .5rem .8rem; border-bottom: 1px solid #f8fafc; text-align: center; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #f8fafc; }
+.stage-inp { width: 88px; padding: .3rem .45rem; border: 1.5px solid var(--border); border-radius: 5px; text-align: center; font-size: .85rem; background: #fff; }
+.stage-inp:focus { outline: none; border-color: var(--blue); }
+.stage-inp.auto { color: var(--blue); font-weight: 700; background: #eff6ff; border-color: #bfdbfe; }
+
+/* ── STAT CHIPS ── */
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+.stat-chip { background: #fff; border: 1px solid var(--border); border-radius: 9px; padding: .8rem 1rem; border-left: 4px solid var(--border); }
+.stat-chip .sc-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: .25rem; }
+.stat-chip .sc-val { font-size: 1.5rem; font-weight: 800; color: var(--navy); line-height: 1; }
+.stat-chip .sc-unit { font-size: .78rem; color: var(--muted); margin-left: .18rem; }
+.stat-chip .sc-sub { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+
+/* ── CLIENT CARD ── */
+.client-card { background: #fff; border: 1.5px solid var(--border); border-radius: var(--radius); padding: 1.1rem 1.25rem; display: flex; align-items: center; cursor: pointer; transition: all .15s; margin-bottom: .6rem; }
+.client-card:hover { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+.avatar { width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, var(--blue), var(--sky)); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 800; font-size: .95rem; flex-shrink: 0; }
+.client-info { flex: 1; padding: 0 1rem; }
+.client-info h3 { font-size: .95rem; font-weight: 700; margin-bottom: .2rem; }
+.client-info p { font-size: .78rem; color: var(--muted); }
+.client-card-right { display: flex; align-items: center; gap: .6rem; color: var(--muted); font-size: .8rem; }
+
+/* ── TEST CARD ── */
+.test-card { background: #fff; border: 1.5px solid var(--border); border-radius: 8px; padding: .9rem 1.1rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; transition: all .15s; }
+.test-card:hover { border-color: var(--border); background: #fafcff; }
+.test-date { font-weight: 700; font-size: .9rem; }
+.test-meta { font-size: .78rem; color: var(--muted); margin-top: .2rem; display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+
+/* ── BADGE ── */
+.badge { display: inline-block; padding: .2rem .55rem; border-radius: 20px; font-size: .72rem; font-weight: 700; }
+.b-blue { background: #dbeafe; color: #1d4ed8; }
+.b-green { background: #dcfce7; color: #15803d; }
+.b-orange { background: #ffedd5; color: #c2410c; }
+.b-purple { background: #f3e8ff; color: #6d28d9; }
+
+/* ── ZONE COLORS ── */
+.zc-Z1 { background: #dbeafe; color: #1e40af; }
+.zc-Z2 { background: #dcfce7; color: #14532d; }
+.zc-Z3 { background: #fef9c3; color: #713f12; }
+.zc-Z4 { background: #ffedd5; color: #7c2d12; }
+.zc-Z5 { background: #fee2e2; color: #7f1d1d; }
+.zc-Z6 { background: #ede9fe; color: #3b0764; }
+.zc-Z7 { background: #fce7f3; color: #500724; }
+.zone-label { padding: .25rem .55rem; border-radius: 6px; font-weight: 800; font-size: .82rem; }
+
+/* ── CHART ── */
+.chart-container { position: relative; height: 280px; }
+
+/* ── DIVIDER ── */
+.divider { height: 1px; background: var(--border); margin: 1.1rem 0; }
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 3rem 1rem; color: var(--muted); }
+.empty .ei { font-size: 2.5rem; margin-bottom: .75rem; }
+.empty h3 { font-size: 1.05rem; font-weight: 700; color: var(--text); margin-bottom: .4rem; }
+.empty p { font-size: .85rem; }
+
+/* ── MODAL ── */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 500; padding: 1rem; backdrop-filter: blur(2px); }
+.modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 480px; box-shadow: var(--shadow-lg); }
+.modal h2 { font-size: 1.1rem; font-weight: 800; color: var(--navy); margin-bottom: 1.2rem; }
+.modal-actions { display: flex; gap: .65rem; justify-content: flex-end; margin-top: 1.2rem; }
+
+/* ── ALERT ── */
+.alert { padding: .7rem 1rem; border-radius: 8px; font-size: .82rem; margin-bottom: .85rem; display: flex; gap: .5rem; align-items: flex-start; }
+.alert-info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+.alert-warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+
+/* ── LOADING ── */
+.loading-cover { position: fixed; inset: 0; background: rgba(255,255,255,.88); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 999; backdrop-filter: blur(4px); }
+.spinner { width: 38px; height: 38px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .75s linear infinite; margin-bottom: .9rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── SECTION LABEL ── */
+.section-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin-bottom: .6rem; }
+
+/* ── FC INFO BOX ── */
+.fc-box { background: #f0f9ff; border: 1.5px solid #bae6fd; border-radius: 8px; padding: .65rem .9rem; font-size: .8rem; color: #0369a1; margin-bottom: .7rem; line-height: 1.55; }
+
+/* ── LOGO UPLOAD ── */
+.logo-drop { border: 2px dashed var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; cursor: pointer; color: var(--muted); font-size: .85rem; transition: all .15s; }
+.logo-drop:hover { border-color: var(--blue); color: var(--blue); }
+.logo-preview-img { max-height: 55px; max-width: 180px; object-fit: contain; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<nav class="topbar">
+  <div class="topbar-left">
+    <div class="logo-wrap" id="logo-wrap" onclick="document.getElementById('logo-file').click()" title="Ajouter votre logo">
+      <img id="logo-img">
+      <span class="logo-icon" id="logo-icon">🏃</span>
+    </div>
+    <div>
+      <div class="app-name">LactatePro</div>
+      <div class="app-sub">Analyse de Test d'Effort</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-secondary btn-sm" onclick="exportData()" title="Exporter les données">⬇ Export</button>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()" title="Importer les données">⬆ Import</button>
+  </div>
+</nav>
+<input type="file" id="logo-file" accept="image/*" style="display:none">
+<input type="file" id="import-file" accept=".json" style="display:none">
+
+<!-- BREADCRUMB -->
+<div class="breadcrumb" id="breadcrumb">
+  <span class="bc-link" onclick="nav('clients')">Clients</span>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- ═══ VIEW: CLIENTS ═══ -->
+  <div id="v-clients">
+    <div class="page-header">
+      <h1>👤 Mes clients</h1>
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModalClient()">+ Nouveau client</button>
+      </div>
+    </div>
+    <div id="clients-list"></div>
+  </div>
+
+  <!-- ═══ VIEW: TESTS ═══ -->
+  <div id="v-tests" style="display:none">
+    <div class="page-header">
+      <h1 id="v-tests-title">Tests</h1>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="nav('clients')">← Retour</button>
+        <button class="btn btn-primary" onclick="openNewTest()">+ Nouveau test</button>
+      </div>
+    </div>
+    <div id="client-summary" class="grid-3" style="margin-bottom:1.25rem"></div>
+    <div id="tests-list"></div>
+  </div>
+
+  <!-- ═══ VIEW: TEST FORM ═══ -->
+  <div id="v-form" style="display:none">
+    <div class="page-header">
+      <h1>📋 Nouveau test</h1>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="nav('tests')">Annuler</button>
+        <button class="btn btn-primary" onclick="saveTest()">💾 Sauvegarder</button>
+      </div>
+    </div>
+
+    <!-- Test info -->
+    <div class="card">
+      <div class="card-header"><h2>Informations générales</h2></div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label class="form-label">Date du test</label>
+          <input type="date" id="f-date" class="form-control">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modalité</label>
+          <select id="f-modalite" class="form-control" onchange="onModalChange()">
+            <option value="Tapis roulant">Tapis roulant (km/h)</option>
+            <option value="Vélo / Ergocycle">Vélo / Ergocycle (W)</option>
+            <option value="Rameur">Rameur (W)</option>
+            <option value="SkiErg">SkiErg (W)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">FC maximale (bpm)</label>
+          <input type="number" id="f-fcmax" class="form-control" placeholder="ex : 204" min="100" max="250">
+        </div>
+      </div>
+    </div>
+
+    <!-- Paliers -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Paliers</h2>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-secondary btn-sm" onclick="removePalier()">− Palier</button>
+          <button class="btn btn-secondary btn-sm" onclick="addPalier()">+ Palier</button>
+        </div>
+      </div>
+      <div class="alert alert-info">
+        <span>ℹ️</span>
+        <span>Palier 0 = mesure au repos (avant l'effort). Saisir la FC repos manuellement. Pour les paliers 1+, la FC sera calculée automatiquement depuis les données collées ci-dessous.</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Palier</th>
+              <th id="th-valeur">Vitesse (km/h)</th>
+              <th>FC moy. (bpm)</th>
+              <th>Lactate (mmol/L)</th>
+            </tr>
+          </thead>
+          <tbody id="paliers-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FC brutes -->
+    <div class="card">
+      <div class="card-header"><h2>Données FC brutes</h2></div>
+      <div class="fc-box">
+        📋 <strong>Protocole fixe : 3 min de palier + 1 min de repos.</strong><br>
+        Colle ici les valeurs FC battement par battement (1 valeur/seconde), séparées par retour à la ligne, virgule ou tabulation. Les données doivent commencer au <strong>début du palier 1</strong> — le palier 0 (repos) est saisi manuellement dans le tableau.
+      </div>
+      <div class="form-group">
+        <label class="form-label">Données FC (palier 1 → fin)</label>
+        <textarea id="f-fc-raw" class="form-control" rows="7" placeholder="128&#10;129&#10;130&#10;131&#10;132&#10;..."></textarea>
+      </div>
+      <div style="display:flex;align-items:center;gap:.9rem">
+        <button class="btn btn-primary" onclick="calcFcMeans()">⚡ Calculer FC moyennes</button>
+        <span id="fc-status" style="font-size:.8rem;color:var(--muted)"></span>
+      </div>
+    </div>
+
+    <!-- Zones -->
+    <div class="card">
+      <div class="card-header"><h2>Calcul des zones d'intensité</h2></div>
+      <div class="alert alert-info">
+        <span>📊</span>
+        <span>Assure-toi d'avoir renseigné toutes les valeurs (vitesse/puissance, FC, lactate) ainsi que la FC max avant de calculer.</span>
+      </div>
+      <button class="btn btn-success btn-lg" onclick="calcZones()">🧮 Calculer LT1, LT2 &amp; zones</button>
+      <div id="zones-preview" style="display:none;margin-top:1rem"></div>
+    </div>
+  </div>
+
+  <!-- ═══ VIEW: RESULTS ═══ -->
+  <div id="v-results" style="display:none">
+    <div class="page-header">
+      <h1 id="res-title">Résultats</h1>
+      <div class="page-actions">
+        <button class="btn btn-secondary" onclick="nav('tests')">← Retour</button>
+        <button class="btn btn-navy btn-lg" onclick="genPDF()">📄 Générer le PDF</button>
+      </div>
+    </div>
+    <div class="stat-grid" id="res-stats"></div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><h2>Courbe Lactate</h2></div>
+        <div class="chart-container"><canvas id="ch-lactate"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Courbe Fréquence Cardiaque</h2></div>
+        <div class="chart-container"><canvas id="ch-fc"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Zones d'intensité</h2></div>
+      <div class="table-wrap">
+        <table id="zones-table">
+          <thead>
+            <tr>
+              <th>Zone</th>
+              <th>Nom</th>
+              <th id="th-sp-min">Min</th>
+              <th id="th-sp-max">Max</th>
+              <th>FC min (bpm)</th>
+              <th>FC max (bpm)</th>
+            </tr>
+          </thead>
+          <tbody id="zones-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<!-- ── MODAL: NOUVEAU CLIENT ── -->
+<div id="modal-client" class="overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h2>Nouveau client</h2>
+    <div class="grid-2">
+      <div class="form-group" style="grid-column:span 2">
+        <label class="form-label">Nom complet *</label>
+        <input type="text" id="m-nom" class="form-control" placeholder="ex : Benjamin NOYER">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Âge</label>
+        <input type="number" id="m-age" class="form-control" placeholder="26" min="10" max="80">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sexe</label>
+        <select id="m-sexe" class="form-control">
+          <option value="H">Homme</option>
+          <option value="F">Femme</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Poids (kg)</label>
+        <input type="number" id="m-poids" class="form-control" placeholder="70" step=".1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Taille (cm)</label>
+        <input type="number" id="m-taille" class="form-control" placeholder="177">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-client').style.display='none'">Annuler</button>
+      <button class="btn btn-primary" onclick="createClient()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading" class="loading-cover" style="display:none">
+  <div class="spinner"></div>
+  <div style="color:var(--muted);font-size:.88rem">Génération du PDF en cours…</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════════════
+const DB_KEY   = 'lactatepro_db';
+const LOGO_KEY = 'lactatepro_logo';
+
+let DB = { clients: [] };   // main data
+let logo = null;             // base64 logo
+let curClientId = null;
+let curTestId   = null;
+let formPaliers = [];        // working paliers array for form
+let formResultats = null;    // computed zones for current form
+let chLactate = null;
+let chFC = null;
+
+// ── INIT ────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadDB();
+  logo = localStorage.getItem(LOGO_KEY) || null;
+  applyLogo();
+  renderClients();
+  showView('clients');
+
+  document.getElementById('logo-file').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => { logo = ev.target.result; localStorage.setItem(LOGO_KEY, logo); applyLogo(); };
+    r.readAsDataURL(f);
+  });
+
+  document.getElementById('import-file').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        DB = JSON.parse(ev.target.result);
+        saveDB();
+        renderClients();
+        nav('clients');
+        alert('Import réussi !');
+      } catch { alert('Fichier invalide.'); }
+    };
+    r.readAsText(f);
+  });
+
+  document.getElementById('m-nom').addEventListener('keydown', e => { if (e.key === 'Enter') createClient(); });
+});
+
+// ── STORAGE ─────────────────────────────────────────
+function loadDB() {
+  try { const raw = localStorage.getItem(DB_KEY); if (raw) DB = JSON.parse(raw); }
+  catch { DB = { clients: [] }; }
+}
+function saveDB() { localStorage.setItem(DB_KEY, JSON.stringify(DB)); }
+function exportData() {
+  const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `LactatePro_${new Date().toISOString().slice(0,10)}.json`; a.click();
+}
+
+// ── LOGO ─────────────────────────────────────────────
+function applyLogo() {
+  const img  = document.getElementById('logo-img');
+  const icon = document.getElementById('logo-icon');
+  if (logo) { img.src = logo; img.style.display = 'block'; icon.style.display = 'none'; }
+  else       { img.style.display = 'none'; icon.style.display = 'block'; }
+}
+
+// ── UTILS ────────────────────────────────────────────
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const fmtDate = d => { if (!d) return '—'; const dt = new Date(d+'T12:00:00'); return dt.toLocaleDateString('fr-FR', {day:'2-digit',month:'long',year:'numeric'}); };
+const initials = n => n.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2);
+const unite = m => m === 'Tapis roulant' ? 'km/h' : 'W';
+const round1 = v => Math.round(v * 10) / 10;
+const modalBadge = m => ({'Tapis roulant':'b-blue','Vélo / Ergocycle':'b-green','Rameur':'b-orange','SkiErg':'b-purple'}[m] || 'b-blue');
+
+// ── NAVIGATION ───────────────────────────────────────
+function nav(viewName) {
+  showView(viewName);
+  if (viewName === 'clients') renderClients();
+  else if (viewName === 'tests') renderTests();
+  setBreadcrumb(viewName);
+}
+
+function showView(v) {
+  ['clients','tests','form','results'].forEach(id => {
+    document.getElementById('v-'+id).style.display = (id === v ? 'block' : 'none');
+  });
+}
+
+function setBreadcrumb(v) {
+  const bc = document.getElementById('breadcrumb');
+  const cl = DB.clients.find(c => c.id === curClientId);
+  let html = `<span class="bc-link" onclick="nav('clients')">Clients</span>`;
+  if (v !== 'clients' && cl) {
+    html += ` <span class="sep">›</span> <span class="bc-link" onclick="nav('tests')">${cl.nom}</span>`;
+  }
+  if (v === 'form')    html += ` <span class="sep">›</span> <span>Nouveau test</span>`;
+  if (v === 'results') html += ` <span class="sep">›</span> <span>Résultats</span>`;
+  bc.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════
+//  CLIENTS
+// ════════════════════════════════════════════════════
+function renderClients() {
+  const el = document.getElementById('clients-list');
+  if (!DB.clients.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">👤</div><h3>Aucun client</h3><p>Commence par créer un client.</p></div>`;
+    return;
+  }
+  el.innerHTML = DB.clients.map(c => `
+    <div class="client-card" onclick="openClient('${c.id}')">
+      <div class="avatar">${initials(c.nom)}</div>
+      <div class="client-info">
+        <h3>${c.nom}</h3>
+        <p>${c.age ? c.age+' ans ·' : ''} ${c.poids ? c.poids+' kg ·' : ''} ${c.taille ? c.taille+' cm ·' : ''} ${c.sexe === 'F' ? 'Femme' : 'Homme'}</p>
+      </div>
+      <div class="client-card-right">
+        <span>${(c.tests||[]).length} test(s)</span>
+        <button class="btn-icon" onclick="event.stopPropagation();deleteClient('${c.id}')" title="Supprimer">🗑</button>
+        <span style="font-size:1.1rem;color:var(--border)">›</span>
+      </div>
+    </div>`).join('');
+}
+
+function openModalClient() {
+  ['m-nom','m-age','m-poids','m-taille'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('modal-client').style.display = 'flex';
+  setTimeout(() => document.getElementById('m-nom').focus(), 80);
+}
+
+function createClient() {
+  const nom = document.getElementById('m-nom').value.trim();
+  if (!nom) { alert('Nom requis.'); return; }
+  const c = {
+    id: uid(), nom,
+    age:    parseInt(document.getElementById('m-age').value)   || 0,
+    sexe:   document.getElementById('m-sexe').value,
+    poids:  parseFloat(document.getElementById('m-poids').value) || 0,
+    taille: parseInt(document.getElementById('m-taille').value) || 0,
+    tests:  []
+  };
+  DB.clients.push(c); saveDB();
+  document.getElementById('modal-client').style.display = 'none';
+  renderClients();
+}
+
+function deleteClient(id) {
+  if (!confirm('Supprimer ce client et tous ses tests ?')) return;
+  DB.clients = DB.clients.filter(c => c.id !== id); saveDB(); renderClients();
+}
+
+function openClient(id) {
+  curClientId = id; nav('tests');
+}
+
+// ════════════════════════════════════════════════════
+//  TESTS
+// ════════════════════════════════════════════════════
+function renderTests() {
+  const cl = DB.clients.find(c => c.id === curClientId); if (!cl) return;
+  document.getElementById('v-tests-title').textContent = cl.nom;
+
+  // Client summary chips
+  document.getElementById('client-summary').innerHTML = [
+    cl.age    ? `<div class="stat-chip" style="border-left-color:var(--blue)"><div class="sc-label">Âge</div><div class="sc-val">${cl.age}<span class="sc-unit">ans</span></div></div>` : '',
+    cl.poids  ? `<div class="stat-chip" style="border-left-color:var(--sky)"><div class="sc-label">Poids</div><div class="sc-val">${cl.poids}<span class="sc-unit">kg</span></div></div>` : '',
+    cl.taille ? `<div class="stat-chip" style="border-left-color:var(--navy)"><div class="sc-label">Taille</div><div class="sc-val">${cl.taille}<span class="sc-unit">cm</span></div></div>` : '',
+  ].join('');
+
+  const tests = (cl.tests||[]).slice().sort((a,b) => b.date.localeCompare(a.date));
+  const el = document.getElementById('tests-list');
+  if (!tests.length) {
+    el.innerHTML = `<div class="empty"><div class="ei">📊</div><h3>Aucun test</h3><p>Crée le premier test d'effort pour ce client.</p></div>`;
+    return;
+  }
+  const u = t => unite(t.modalite);
+  el.innerHTML = tests.map(t => {
+    const r = t.resultats;
+    return `
+    <div class="test-card">
+      <div>
+        <div class="test-date">${fmtDate(t.date)}</div>
+        <div class="test-meta">
+          <span class="badge ${modalBadge(t.modalite)}">${t.modalite}</span>
+          ${r ? `
+            <span>LT1 : <strong>${r.lt1.valeur} ${u(t)}</strong> / <strong>${r.lt1.fc} bpm</strong></span>
+            <span>LT2 : <strong>${r.lt2.valeur} ${u(t)}</strong> / <strong>${r.lt2.fc} bpm</strong></span>
+          ` : '<span style="color:var(--muted)">— zones non calculées</span>'}
+        </div>
+      </div>
+      <div style="display:flex;gap:.45rem">
+        <button class="btn btn-secondary btn-sm" onclick="viewTest('${t.id}')">📊 Voir</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTest('${t.id}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openNewTest() {
+  curTestId = null;
+  formPaliers = defaultPaliers();
+  formResultats = null;
+  document.getElementById('f-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f-modalite').value = 'Tapis roulant';
+  document.getElementById('f-fcmax').value = '';
+  document.getElementById('f-fc-raw').value = '';
+  document.getElementById('fc-status').textContent = '';
+  document.getElementById('zones-preview').style.display = 'none';
+  onModalChange();
+  renderPaliersForm();
+  showView('form');
+  setBreadcrumb('form');
+}
+
+function deleteTest(id) {
+  if (!confirm('Supprimer ce test ?')) return;
+  const cl = DB.clients.find(c => c.id === curClientId); if (!cl) return;
+  cl.tests = (cl.tests||[]).filter(t => t.id !== id);
+  saveDB(); renderTests();
+}
+
+function viewTest(id) {
+  const cl = DB.clients.find(c => c.id === curClientId); if (!cl) return;
+  const t = (cl.tests||[]).find(t => t.id === id); if (!t) return;
+  curTestId = id;
+  renderResultsView(t);
+}
+
+// ════════════════════════════════════════════════════
+//  FORM — PALIERS
+// ════════════════════════════════════════════════════
+function defaultPaliers() {
+  return Array.from({length:11}, (_,i) => ({ rang:i, valeur: i===0?0:null, fc:null, lactate:null }));
+}
+
+function onModalChange() {
+  const m = document.getElementById('f-modalite').value;
+  document.getElementById('th-valeur').textContent = m === 'Tapis roulant' ? 'Vitesse (km/h)' : 'Puissance (W)';
+}
+
+function renderPaliersForm() {
+  const tbody = document.getElementById('paliers-body');
+  const m = document.getElementById('f-modalite').value;
+  const isSpeed = m === 'Tapis roulant';
+  tbody.innerHTML = formPaliers.map((p, i) => `
+    <tr>
+      <td><strong>${p.rang}</strong>${p.rang===0?' <span style="font-size:.7rem;color:var(--muted)">(repos)</span>':''}</td>
+      <td>
+        <input class="stage-inp" id="pv-${i}" type="number" value="${p.valeur!==null?p.valeur:''}"
+          placeholder="—" step="${isSpeed?'.1':'10'}"
+          onchange="formPaliers[${i}].valeur=this.value===''?null:parseFloat(this.value)"
+          ${p.rang===0?'readonly style="background:#f8fafc;color:var(--muted)"':''}>
+      </td>
+      <td>
+        <input class="stage-inp${p.rang>0&&p.fc!==null?' auto':''}" id="pf-${i}" type="number"
+          value="${p.fc!==null?p.fc:''}"
+          placeholder="${p.rang===0?'Saisir':'Auto'}"
+          onchange="formPaliers[${i}].fc=this.value===''?null:parseFloat(this.value)">
+      </td>
+      <td>
+        <input class="stage-inp" id="pl-${i}" type="number" value="${p.lactate!==null?p.lactate:''}"
+          placeholder="—" step=".1"
+          onchange="formPaliers[${i}].lactate=this.value===''?null:parseFloat(this.value)">
+      </td>
+    </tr>`).join('');
+}
+
+function addPalier() {
+  formPaliers.push({ rang: formPaliers.length, valeur:null, fc:null, lactate:null });
+  renderPaliersForm();
+}
+function removePalier() {
+  if (formPaliers.length <= 2) return;
+  formPaliers.pop(); renderPaliersForm();
+}
+
+function syncFormPaliers() {
+  formPaliers.forEach((p,i) => {
+    const vEl = document.getElementById(`pv-${i}`);
+    const fEl = document.getElementById(`pf-${i}`);
+    const lEl = document.getElementById(`pl-${i}`);
+    if (vEl) p.valeur  = vEl.value===''  ? null : parseFloat(vEl.value);
+    if (fEl) p.fc      = fEl.value===''  ? null : parseFloat(fEl.value);
+    if (lEl) p.lactate = lEl.value===''  ? null : parseFloat(lEl.value);
+  });
+}
+
+// ════════════════════════════════════════════════════
+//  FC CALCULATION
+// ════════════════════════════════════════════════════
+function calcFcMeans() {
+  const raw = document.getElementById('f-fc-raw').value.trim();
+  if (!raw) { document.getElementById('fc-status').textContent = '⚠ Aucune donnée.'; return; }
+
+  const vals = raw.split(/[\n,;\t ]+/)
+    .map(v => parseInt(v)).filter(v => !isNaN(v) && v > 20 && v < 300);
+
+  if (!vals.length) { document.getElementById('fc-status').textContent = '⚠ Aucune valeur valide.'; return; }
+
+  const STAGE = 180, REST = 60, BLOCK = STAGE + REST;
+  let count = 0;
+  for (let i = 1; i < formPaliers.length; i++) {
+    const start = (i-1) * BLOCK;
+    const end   = start + STAGE;
+    if (start >= vals.length) break;
+    const slice = vals.slice(start, Math.min(end, vals.length));
+    if (slice.length) {
+      const mean = Math.round(slice.reduce((a,b)=>a+b,0) / slice.length);
+      formPaliers[i].fc = mean;
+      const el = document.getElementById(`pf-${i}`);
+      if (el) { el.value = mean; el.classList.add('auto'); }
+      count++;
+    }
+  }
+  const mins = Math.floor(vals.length / 60);
+  document.getElementById('fc-status').textContent =
+    `✅ ${count} palier(s) · ${vals.length} s (${mins} min) de données`;
+}
+
+// ════════════════════════════════════════════════════
+//  DMAX + LT1 + ZONES
+// ════════════════════════════════════════════════════
+function calcZones() {
+  syncFormPaliers();
+  const fcMax = parseInt(document.getElementById('f-fcmax').value) || 0;
+  if (!fcMax) { alert('Saisir la FC max.'); return; }
+
+  const valid = formPaliers.filter(p => p.valeur !== null && p.lactate !== null && p.fc !== null);
+  if (valid.length < 4) { alert('Au moins 4 paliers complets (vitesse/puissance + FC + lactate) sont nécessaires.'); return; }
+
+  formResultats = computeZones(valid, fcMax);
+  document.getElementById('zones-preview').style.display = 'block';
+  document.getElementById('zones-preview').innerHTML = buildZonesHTML(
+    formResultats, unite(document.getElementById('f-modalite').value)
+  );
+}
+
+function computeZones(valid, fcMax) {
+  const baseLactate = valid[0].lactate;
+
+  // — LT1 : dernier palier où lactate ≤ baseline + 0.4
+  let lt1i = 0;
+  for (let i = 0; i < valid.length; i++) {
+    if (valid[i].lactate <= baseLactate + 0.4) lt1i = i; else break;
+  }
+
+  // — LT2 / Dmax à partir de LT1
+  const seg = valid.slice(lt1i);
+  let lt2i = lt1i;
+  if (seg.length >= 3) {
+    const f = seg[0], l = seg[seg.length-1];
+    const dx = l.valeur - f.valeur, dy = l.lactate - f.lactate;
+    const a = dy, b = -dx, c = -dy*f.valeur + dx*f.lactate;
+    const denom = Math.sqrt(a*a + b*b);
+    let maxD = -1;
+    for (let i = 1; i < seg.length - 1; i++) {
+      const d = denom > 0 ? Math.abs(a*seg[i].valeur + b*seg[i].lactate + c) / denom : 0;
+      if (d > maxD) { maxD = d; lt2i = lt1i + i; }
+    }
+  } else {
+    lt2i = valid.length - 1;
+  }
+
+  const lt1 = valid[lt1i], lt2 = valid[lt2i];
+  const [fc1, fc2] = [lt1.fc, lt2.fc];
+  const [sp1, sp2] = [lt1.valeur, lt2.valeur];
+
+  // — HR zones
+  const z1maxHR  = Math.round(2*fc1 - fc2);
+  const z1minHR  = Math.round(z1maxHR * 0.9);
+  const z3maxHR  = Math.round(fc2 - 0.15*(fc2-fc1));
+  const z4maxHR  = Math.round(fc2 + 0.5*(fc2-fc1));
+
+  // — Speed zones
+  const sp = (a, b) => round1(a + b*(sp2-sp1));
+  const sp_z1min = round1(sp1 * 0.75);
+  const sp_z1max = round1(sp1 * 0.9);
+  const sp_z3max = round1(sp2 - 0.15*(sp2-sp1));
+  const sp_z4max = round1(sp2 + 0.5*(sp2-sp1));
+  const sp_z5max = round1(sp2 * 1.12);
+  const sp_z6max = round1(sp2 * 1.28);
+  const sp_z7max = round1(sp2 * 1.5);
+
+  const zones = [
+    { id:'Z1', nom:'Récupération active',    minHR:z1minHR,   maxHR:z1maxHR,   minSp:sp_z1min,    maxSp:sp_z1max,    col:'#3b82f6' },
+    { id:'Z2', nom:'Endurance fondamentale', minHR:z1maxHR,   maxHR:fc1,       minSp:sp_z1max,    maxSp:round1(sp1), col:'#22c55e' },
+    { id:'Z3', nom:'Tempo / Seuil 1',        minHR:fc1,       maxHR:z3maxHR,   minSp:round1(sp1), maxSp:sp_z3max,    col:'#eab308' },
+    { id:'Z4', nom:'Seuil 2 / Lactate',      minHR:z3maxHR,   maxHR:z4maxHR,   minSp:sp_z3max,    maxSp:sp_z4max,    col:'#f97316' },
+    { id:'Z5', nom:'VO₂max',                 minHR:z4maxHR,   maxHR:fcMax,     minSp:sp_z4max,    maxSp:sp_z5max,    col:'#ef4444' },
+    { id:'Z6', nom:'Capacité anaérobie',      minHR:null,      maxHR:null,      minSp:sp_z5max,    maxSp:sp_z6max,    col:'#8b5cf6' },
+    { id:'Z7', nom:'Puissance anaérobie',     minHR:null,      maxHR:null,      minSp:sp_z6max,    maxSp:sp_z7max,    col:'#ec4899' },
+  ];
+
+  return {
+    lt1:{ rang:lt1i, valeur:round1(sp1), fc:fc1, lactate:lt1.lactate },
+    lt2:{ rang:lt2i, valeur:round1(sp2), fc:fc2, lactate:lt2.lactate },
+    fcMax, zones,
+    paliers: valid,
+  };
+}
+
+function buildZonesHTML(r, un) {
+  const chips = `
+    <div class="stat-grid" style="margin-bottom:1rem">
+      <div class="stat-chip" style="border-left-color:${r.zones[2].col}">
+        <div class="sc-label">LT1 — Seuil 1</div>
+        <div class="sc-val">${r.lt1.valeur}<span class="sc-unit">${un}</span></div>
+        <div class="sc-sub">${r.lt1.fc} bpm · ${r.lt1.lactate} mmol/L</div>
+      </div>
+      <div class="stat-chip" style="border-left-color:${r.zones[3].col}">
+        <div class="sc-label">LT2 — Seuil 2 (Dmax)</div>
+        <div class="sc-val">${r.lt2.valeur}<span class="sc-unit">${un}</span></div>
+        <div class="sc-sub">${r.lt2.fc} bpm · ${r.lt2.lactate} mmol/L</div>
+      </div>
+      <div class="stat-chip" style="border-left-color:var(--navy)">
+        <div class="sc-label">FC maximale</div>
+        <div class="sc-val">${r.fcMax}<span class="sc-unit">bpm</span></div>
+      </div>
+    </div>`;
+  const rows = r.zones.map(z => `
+    <tr>
+      <td><span class="zone-label zc-${z.id}">${z.id}</span></td>
+      <td style="text-align:left">${z.nom}</td>
+      <td>${z.minSp}</td><td>${z.maxSp}</td>
+      <td>${z.minHR ?? '—'}</td><td>${z.maxHR ?? '—'}</td>
+    </tr>`).join('');
+  return chips + `
+    <div class="table-wrap"><table>
+      <thead><tr><th>Zone</th><th>Nom</th><th>${un} min</th><th>${un} max</th><th>FC min</th><th>FC max</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+// ════════════════════════════════════════════════════
+//  SAVE TEST
+// ════════════════════════════════════════════════════
+function saveTest() {
+  syncFormPaliers();
+  const cl = DB.clients.find(c => c.id === curClientId); if (!cl) return;
+  const test = {
+    id:        curTestId || uid(),
+    date:      document.getElementById('f-date').value,
+    modalite:  document.getElementById('f-modalite').value,
+    fcMax:     parseInt(document.getElementById('f-fcmax').value) || 0,
+    paliers:   formPaliers.filter(p => p.valeur !== null || p.rang === 0),
+    resultats: formResultats,
+  };
+  if (curTestId) {
+    const idx = (cl.tests||[]).findIndex(t => t.id === curTestId);
+    if (idx >= 0) cl.tests[idx] = test; else (cl.tests = cl.tests||[]).push(test);
+  } else {
+    (cl.tests = cl.tests||[]).push(test);
+  }
+  curTestId = test.id;
+  saveDB();
+  if (test.resultats) { renderResultsView(test); }
+  else { nav('tests'); }
+}
+
+// ════════════════════════════════════════════════════
+//  RESULTS VIEW
+// ════════════════════════════════════════════════════
+function renderResultsView(test) {
+  const cl = DB.clients.find(c => c.id === curClientId);
+  const r  = test.resultats;
+  const un = unite(test.modalite);
+
+  document.getElementById('res-title').textContent =
+    `Test du ${fmtDate(test.date)} — ${test.modalite}`;
+
+  // Stats chips
+  if (r) {
+    document.getElementById('res-stats').innerHTML = `
+      <div class="stat-chip" style="border-left-color:${r.zones[2].col}">
+        <div class="sc-label">LT1 — Seuil 1</div>
+        <div class="sc-val">${r.lt1.valeur}<span class="sc-unit">${un}</span></div>
+        <div class="sc-sub">${r.lt1.fc} bpm · ${r.lt1.lactate} mmol/L</div>
+      </div>
+      <div class="stat-chip" style="border-left-color:${r.zones[3].col}">
+        <div class="sc-label">LT2 — Seuil 2 (Dmax)</div>
+        <div class="sc-val">${r.lt2.valeur}<span class="sc-unit">${un}</span></div>
+        <div class="sc-sub">${r.lt2.fc} bpm · ${r.lt2.lactate} mmol/L</div>
+      </div>
+      <div class="stat-chip" style="border-left-color:var(--navy)">
+        <div class="sc-label">FC max</div>
+        <div class="sc-val">${r.fcMax}<span class="sc-unit">bpm</span></div>
+      </div>
+      <div class="stat-chip">
+        <div class="sc-label">Paliers</div>
+        <div class="sc-val">${test.paliers.length}</div>
+      </div>`;
+  } else {
+    document.getElementById('res-stats').innerHTML =
+      `<div class="alert alert-warning">⚠ Aucun calcul de zones disponible pour ce test.</div>`;
+  }
+
+  // Zones table
+  if (r) {
+    document.getElementById('th-sp-min').textContent = `${un} min`;
+    document.getElementById('th-sp-max').textContent = `${un} max`;
+    document.getElementById('zones-body').innerHTML = r.zones.map(z => `
+      <tr>
+        <td><span class="zone-label zc-${z.id}">${z.id}</span></td>
+        <td style="text-align:left">${z.nom}</td>
+        <td>${z.minSp}</td><td>${z.maxSp}</td>
+        <td>${z.minHR ?? '—'}</td><td>${z.maxHR ?? '—'}</td>
+      </tr>`).join('');
+  }
+
+  showView('results');
+  setBreadcrumb('results');
+  setTimeout(() => drawCharts(test), 120);
+}
+
+// ════════════════════════════════════════════════════
+//  CHARTS
+// ════════════════════════════════════════════════════
+function drawCharts(test) {
+  const r  = test.resultats;
+  const un = unite(test.modalite);
+  const p  = test.paliers.filter(p => p.valeur !== null && p.lactate !== null);
+  const pFC = test.paliers.filter(p => p.valeur !== null && p.fc !== null);
+
+  if (chLactate) { chLactate.destroy(); chLactate = null; }
+  if (chFC)      { chFC.destroy();      chFC      = null; }
+
+  // ── LACTATE ──
+  const lacDS = [{
+    label: 'Lactate (mmol/L)',
+    data: p.map(x => ({ x: x.valeur, y: x.lactate })),
+    borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
+    borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#2563eb',
+    tension: .35, fill: true,
+  }];
+
+  if (r && p.length >= 2) {
+    const f = p[0], l = p[p.length-1];
+    lacDS.push({
+      label: 'Droite Dmax', data: [{x:f.valeur,y:f.lactate},{x:l.valeur,y:l.lactate}],
+      borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false,
+    });
+    lacDS.push({
+      label: `LT1 (${r.lt1.valeur} ${un})`,
+      data: [{x:r.lt1.valeur,y:0},{x:r.lt1.valeur,y:r.lt1.lactate+.3}],
+      borderColor:'#22c55e', borderWidth:2, borderDash:[4,4],
+      pointRadius:[0,8], pointBackgroundColor:'#22c55e', fill:false,
+    });
+    lacDS.push({
+      label: `LT2 / Dmax (${r.lt2.valeur} ${un})`,
+      data: [{x:r.lt2.valeur,y:0},{x:r.lt2.valeur,y:r.lt2.lactate+.3}],
+      borderColor:'#ef4444', borderWidth:2, borderDash:[4,4],
+      pointRadius:[0,8], pointBackgroundColor:'#ef4444', fill:false,
+    });
+  }
+
+  chLactate = new Chart(document.getElementById('ch-lactate'), {
+    type:'line', data:{ datasets: lacDS },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ type:'linear', title:{display:true,text:un==='km/h'?'Vitesse (km/h)':'Puissance (W)'} },
+        y:{ title:{display:true,text:'Lactate (mmol/L)'}, min:0 }
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:12,font:{size:10}} } }
+    }
+  });
+
+  // ── FC ──
+  const xMin = pFC[0]?.valeur || 0;
+  const xMax = pFC[pFC.length-1]?.valeur || 20;
+  const fcDS = [{
+    label: 'FC moyenne (bpm)',
+    data: pFC.map(x => ({ x: x.valeur, y: x.fc })),
+    borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,.07)',
+    borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#1e3a5f',
+    tension: .35, fill: true,
+  }];
+
+  if (r) {
+    fcDS.push({ label:`FC LT1 (${r.lt1.fc} bpm)`, data:[{x:xMin,y:r.lt1.fc},{x:xMax,y:r.lt1.fc}], borderColor:'#22c55e', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false });
+    fcDS.push({ label:`FC LT2 (${r.lt2.fc} bpm)`, data:[{x:xMin,y:r.lt2.fc},{x:xMax,y:r.lt2.fc}], borderColor:'#ef4444', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false });
+    fcDS.push({ label:`FC max (${r.fcMax} bpm)`,  data:[{x:xMin,y:r.fcMax},{x:xMax,y:r.fcMax}],   borderColor:'#94a3b8', borderWidth:1,   borderDash:[3,3], pointRadius:0, fill:false });
+  }
+
+  chFC = new Chart(document.getElementById('ch-fc'), {
+    type:'line', data:{ datasets: fcDS },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      scales:{
+        x:{ type:'linear', title:{display:true,text:un==='km/h'?'Vitesse (km/h)':'Puissance (W)'} },
+        y:{ title:{display:true,text:'Fréquence cardiaque (bpm)'}, min:0 }
+      },
+      plugins:{ legend:{ position:'bottom', labels:{boxWidth:12,font:{size:10}} } }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════
+//  PDF GENERATION
+// ════════════════════════════════════════════════════
+async function genPDF() {
+  const cl = DB.clients.find(c => c.id === curClientId);
+  const test = (cl?.tests||[]).find(t => t.id === curTestId);
+  if (!test?.resultats) { alert('Veuillez d\'abord calculer les zones.'); return; }
+  document.getElementById('loading').style.display = 'flex';
+  await new Promise(r => setTimeout(r, 250));
+  try { await buildPDF(cl, test); }
+  catch(e) { console.error(e); alert('Erreur PDF : ' + e.message); }
+  finally   { document.getElementById('loading').style.display = 'none'; }
+}
+
+async function buildPDF(cl, test) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W = 210, H = 297, M = 14, CW = W - 2*M;
+  const r = test.resultats, un = unite(test.modalite);
+
+  // Zone color arrays for autoTable
+  const ZAcc = {
+    Z1:[59,130,246], Z2:[34,197,94], Z3:[234,179,8],
+    Z4:[249,115,22], Z5:[239,68,68], Z6:[139,92,246], Z7:[236,72,153]
+  };
+  const ZBg = {
+    Z1:[219,234,254], Z2:[220,252,231], Z3:[254,249,195],
+    Z4:[255,237,213], Z5:[254,226,226], Z6:[237,233,254], Z7:[252,231,243]
+  };
+
+  // ── PAGE 1 ──────────────────────────────────────────
+  // Header bar
+  doc.setFillColor(30,58,95);
+  doc.rect(0, 0, W, 30, 'F');
+
+  if (logo) {
+    try { doc.addImage(logo, 'PNG', M, 5, 28, 20, '', 'FAST'); } catch{}
+  }
+
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(15); doc.setFont(undefined,'bold');
+  doc.text('COMPTE RENDU TEST D\'EFFORT', W/2, 13, {align:'center'});
+  doc.setFontSize(8.5); doc.setFont(undefined,'normal');
+  doc.text('Analyse Lactate & Fréquence Cardiaque', W/2, 20, {align:'center'});
+  doc.text(fmtDate(test.date), W-M, 13, {align:'right'});
+
+  // Client info
+  doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+  doc.roundedRect(M, 34, CW, 20, 2, 2, 'FD');
+  const labels6  = ['CLIENT','ÂGE','POIDS','TAILLE','MODALITÉ','FC MAX'];
+  const values6  = [cl.nom, cl.age?cl.age+' ans':'—', cl.poids?cl.poids+' kg':'—', cl.taille?cl.taille+' cm':'—', test.modalite, r.fcMax+' bpm'];
+  const xPos = [M+3, M+50, M+73, M+96, M+120, M+162];
+  doc.setTextColor(100,116,139); doc.setFontSize(6.5);
+  labels6.forEach((l,i) => doc.text(l, xPos[i], 40));
+  doc.setTextColor(15,23,42); doc.setFontSize(9); doc.setFont(undefined,'bold');
+  doc.text(cl.nom, xPos[0], 48); doc.setFont(undefined,'normal');
+  values6.slice(1).forEach((v,i) => doc.text(v, xPos[i+1], 48));
+
+  // LT1/LT2 bar
+  doc.setFillColor(255,255,255); doc.setDrawColor(226,232,240);
+  doc.roundedRect(M, 57, CW, 20, 2, 2, 'FD');
+
+  // LT1
+  doc.setFillColor(34,197,94); doc.roundedRect(M+3, 60, 3.5, 13, 1, 1, 'F');
+  doc.setTextColor(100,116,139); doc.setFontSize(6.5);
+  doc.text('LT1 — SEUIL 1', M+9.5, 64.5);
+  doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont(undefined,'bold');
+  doc.text(`${r.lt1.valeur} ${un}`, M+9.5, 71.5);
+  doc.setFont(undefined,'normal'); doc.setFontSize(7.5); doc.setTextColor(100,116,139);
+  doc.text(`${r.lt1.fc} bpm · ${r.lt1.lactate} mmol/L`, M+9.5, 76.5);
+
+  // LT2
+  doc.setFillColor(239,68,68); doc.roundedRect(M+60, 60, 3.5, 13, 1, 1, 'F');
+  doc.setTextColor(100,116,139); doc.setFontSize(6.5);
+  doc.text('LT2 — SEUIL 2 (Dmax)', M+66, 64.5);
+  doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont(undefined,'bold');
+  doc.text(`${r.lt2.valeur} ${un}`, M+66, 71.5);
+  doc.setFont(undefined,'normal'); doc.setFontSize(7.5); doc.setTextColor(100,116,139);
+  doc.text(`${r.lt2.fc} bpm · ${r.lt2.lactate} mmol/L`, M+66, 76.5);
+
+  // Paliers
+  doc.setFillColor(30,58,95); doc.roundedRect(M+130, 60, 3.5, 13, 1, 1, 'F');
+  doc.setTextColor(100,116,139); doc.setFontSize(6.5);
+  doc.text('PALIERS', M+136, 64.5);
+  doc.setTextColor(15,23,42); doc.setFontSize(11); doc.setFont(undefined,'bold');
+  doc.text(String(test.paliers.length), M+136, 71.5);
+  doc.setFont(undefined,'normal');
+
+  // Charts from canvas
+  const chY = 82, chH = 88, chW2 = (CW - 5) / 2;
+
+  // Section labels
+  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
+  doc.text('COURBE LACTATE', M, chY - 2);
+  doc.text('COURBE FRÉQUENCE CARDIAQUE', M + chW2 + 5, chY - 2);
+  doc.setFont(undefined,'normal');
+
+  const lacCanvas = document.getElementById('ch-lactate');
+  const fcCanvas  = document.getElementById('ch-fc');
+  if (lacCanvas && chLactate) {
+    doc.addImage(lacCanvas.toDataURL('image/png'), 'PNG', M, chY, chW2, chH);
+  } else { pdfChartPlaceholder(doc, M, chY, chW2, chH, 'Courbe Lactate'); }
+  if (fcCanvas && chFC) {
+    doc.addImage(fcCanvas.toDataURL('image/png'), 'PNG', M+chW2+5, chY, chW2, chH);
+  } else { pdfChartPlaceholder(doc, M+chW2+5, chY, chW2, chH, 'Courbe FC'); }
+
+  // ── PAGE 2 ──────────────────────────────────────────
+  doc.addPage();
+
+  doc.setFillColor(30,58,95);
+  doc.rect(0, 0, W, 22, 'F');
+  if (logo) { try { doc.addImage(logo,'PNG',M,3,20,16,'','FAST'); } catch{} }
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(13); doc.setFont(undefined,'bold');
+  doc.text('ZONES D\'INTENSITÉ', W/2, 10, {align:'center'});
+  doc.setFontSize(8); doc.setFont(undefined,'normal');
+  doc.text(`${cl.nom} — ${fmtDate(test.date)}`, W/2, 17, {align:'center'});
+
+  // Table
+  doc.autoTable({
+    head: [['Zone','Nom',`${un} min`,`${un} max`,'FC min (bpm)','FC max (bpm)']],
+    body: r.zones.map(z => [
+      z.id, z.nom,
+      String(z.minSp), String(z.maxSp),
+      z.minHR ?? '—', z.maxHR ?? '—',
+    ]),
+    startY: 27,
+    theme: 'grid',
+    headStyles: { fillColor:[30,58,95], textColor:[255,255,255], fontStyle:'bold', fontSize:9, halign:'center' },
+    bodyStyles: { fontSize:9.5, halign:'center', cellPadding:3 },
+    columnStyles: { 0:{fontStyle:'bold', cellWidth:14}, 1:{halign:'left', cellWidth:55} },
+    didDrawCell: data => {
+      if (data.section === 'body') {
+        const zid = r.zones[data.row.index]?.id;
+        if (data.column.index === 0 && ZAcc[zid]) {
+          doc.setFillColor(...ZAcc[zid]);
+          doc.rect(data.cell.x, data.cell.y, 2.5, data.cell.height, 'F');
+        }
+        if (ZBg[zid]) {
+          doc.setFillColor(...ZBg[zid]);
+          doc.rect(data.cell.x + 2.5, data.cell.y, data.cell.width - 2.5, data.cell.height, 'F');
+          doc.setTextColor(15,23,42);
+        }
+      }
+    },
+    alternateRowStyles: {},
+    margin: { left:M, right:M },
+  });
+
+  // Note méthodologique
+  const noteY = doc.lastAutoTable.finalY + 10;
+  doc.setFontSize(8); doc.setTextColor(30,58,95); doc.setFont(undefined,'bold');
+  doc.text('Note méthodologique', M, noteY);
+  doc.setFont(undefined,'normal'); doc.setFontSize(7.5); doc.setTextColor(100,116,139);
+  [
+    `LT1 (Seuil 1) : dernier palier où le lactate reste ≤ lactate repos + 0,4 mmol/L.`,
+    `LT2 (Seuil 2) : méthode Dmax — point de distance maximale à la droite reliant le premier et le dernier`,
+    `point de la courbe lactate-${un} (à partir de LT1).`,
+    `Les zones Z1–Z5 intègrent des plages de fréquence cardiaque et de ${un === 'km/h' ? 'vitesse' : 'puissance'}.`,
+    `Les zones Z6–Z7 sont des zones de ${un === 'km/h' ? 'vitesse' : 'puissance'} anaérobie (pas de repère FC fiable).`,
+  ].forEach((l, i) => doc.text(l, M, noteY + 5.5 + i*4.2));
+
+  // Footer
+  const total = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= total; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(226,232,240);
+    doc.line(M, H-11, W-M, H-11);
+    doc.setFontSize(6.5); doc.setTextColor(160,160,160);
+    doc.text('Généré par LactatePro', M, H-6.5);
+    doc.text(`Page ${i} / ${total}`, W/2, H-6.5, {align:'center'});
+    doc.text(new Date().toLocaleDateString('fr-FR'), W-M, H-6.5, {align:'right'});
+  }
+
+  const filename = `LactatePro_${cl.nom.replace(/\s+/g,'_')}_${test.date}.pdf`;
+  doc.save(filename);
+}
+
+function pdfChartPlaceholder(doc, x, y, w, h, label) {
+  doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
+  doc.rect(x, y, w, h, 'FD');
+  doc.setTextColor(160,160,160); doc.setFontSize(8);
+  doc.text(label, x+w/2, y+h/2, {align:'center'});
+}
+</script>
+</body>
+</html>
