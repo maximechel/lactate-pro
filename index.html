@@ -1001,22 +1001,24 @@ function drawCharts(test) {
 
   // ── LACTATE ──
   const lacPts = p.map(x => ({ x: x.valeur, y: x.lactate }));
+  // Smooth trend via polynomial regression (150 interpolated pts)
   const lacSmooth = smoothPts(lacPts, 3, 150);
 
   const lacDS = [
-    // Smooth trend line (no dots)
+    // Smooth trend line (monotone bezier, no dots on line)
     {
       label: 'Lactate (mmol/L)',
       data: lacSmooth,
       borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
-      borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0,
+      borderWidth: 2.5, pointRadius: 0, fill: true,
+      tension: 0.4, cubicInterpolationMode: 'monotone',
     },
     // Actual data points (dots only, no line)
     {
       label: '_points',
       data: lacPts,
-      borderColor: '#2563eb', backgroundColor: '#2563eb',
-      borderWidth: 0, pointRadius: 5, showLine: false, fill: false,
+      borderColor: '#fff', backgroundColor: '#2563eb',
+      borderWidth: 2, pointRadius: 5, showLine: false, fill: false,
     },
   ];
 
@@ -1071,14 +1073,15 @@ function drawCharts(test) {
       label: 'FC moyenne (bpm)',
       data: fcSmooth,
       borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,.07)',
-      borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0,
+      borderWidth: 2.5, pointRadius: 0, fill: true,
+      tension: 0.4, cubicInterpolationMode: 'monotone',
     },
     // Actual data points
     {
       label: '_fcpts',
       data: fcPts,
-      borderColor: '#1e3a5f', backgroundColor: '#1e3a5f',
-      borderWidth: 0, pointRadius: 5, showLine: false, fill: false,
+      borderColor: '#fff', backgroundColor: '#1e3a5f',
+      borderWidth: 2, pointRadius: 5, showLine: false, fill: false,
     },
   ];
 
