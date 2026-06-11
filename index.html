@@ -807,10 +807,10 @@ function computeZones(valid, fcMax) {
   const sp_z7max = round1(vma * 1.50);
 
   const zones = [
-    { id:'Z1', nom:'Récupération active',    minHR:z1minHR,   maxHR:z1maxHR,   minSp:sp_z1min,    maxSp:sp_z1max,    col:'#3b82f6' },
-    { id:'Z2', nom:'Endurance fondamentale', minHR:z1maxHR,   maxHR:fc1,       minSp:sp_z1max,    maxSp:round1(sp1), col:'#22c55e' },
-    { id:'Z3', nom:'Tempo / Seuil 1',        minHR:fc1,       maxHR:z3maxHR,   minSp:round1(sp1), maxSp:sp_z3max,    col:'#eab308' },
-    { id:'Z4', nom:'Seuil 2 / Lactate',      minHR:z3maxHR,   maxHR:z4maxHR,   minSp:sp_z3max,    maxSp:sp_z4max,    col:'#f97316' },
+    { id:'Z1', nom:'Échauffement',                    minHR:z1minHR,   maxHR:z1maxHR,   minSp:sp_z1min,    maxSp:sp_z1max,    col:'#3b82f6' },
+    { id:'Z2', nom:'Endurance fondamentale (Seuil 1)', minHR:z1maxHR,  maxHR:fc1,       minSp:sp_z1max,    maxSp:round1(sp1), col:'#22c55e' },
+    { id:'Z3', nom:'Tempo',                           minHR:fc1,       maxHR:z3maxHR,   minSp:round1(sp1), maxSp:sp_z3max,    col:'#eab308' },
+    { id:'Z4', nom:'Seuil 2',                         minHR:z3maxHR,   maxHR:z4maxHR,   minSp:sp_z3max,    maxSp:sp_z4max,    col:'#f97316' },
     { id:'Z5', nom:'VO₂max',                 minHR:z4maxHR,   maxHR:fcMax,     minSp:sp_z4max,    maxSp:sp_z5max,    col:'#ef4444' },
     { id:'Z6', nom:'Capacité anaérobie',      minHR:null,      maxHR:null,      minSp:sp_z5max,    maxSp:sp_z6max,    col:'#8b5cf6' },
     { id:'Z7', nom:'Puissance anaérobie',     minHR:null,      maxHR:null,      minSp:sp_z6max,    maxSp:sp_z7max,    col:'#ec4899' },
@@ -1227,7 +1227,7 @@ async function buildPDF(cl, test) {
   doc.text('Note méthodologique', M, noteY);
   doc.setFont(undefined,'normal'); doc.setFontSize(7.5); doc.setTextColor(100,116,139);
   [
-    `LT1 (Seuil 1) : dernier palier où le lactate reste ≤ lactate repos + 0,4 mmol/L.`,
+    `LT1 (Seuil 1) : dernier palier avant que le lactate n'augmente de +0,4 mmol/L.`,
     `LT2 (Seuil 2) : méthode Dmax — point de distance maximale à la droite reliant le premier et le dernier`,
     `point de la courbe lactate-${un} (à partir de LT1).`,
     `Les zones Z1–Z5 intègrent des plages de fréquence cardiaque et de ${un === 'km/h' ? 'vitesse' : 'puissance'}.`,
