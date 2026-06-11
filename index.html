@@ -433,6 +433,58 @@ let formResultats = null;    // computed zones for current form
 let chLactate = null;
 let chFC = null;
 
+// ── Polynomial regression helpers ────────────────────
+function polyRegress(xs, ys, deg) {
+  const n = xs.length, m = deg + 1;
+  // Build normal equations A^T A x = A^T y
+  const A = Array.from({length:n}, (_,i) => Array.from({length:m}, (_,j) => Math.pow(xs[i],j)));
+  const At = A[0].map((_,j) => A.map(r => r[j]));
+  const AtA = At.map(r => At[0].map((_,j) => r.reduce((s,_,k) => s + r[k]*At[j][k], 0)));
+  // Actually use simpler matrix multiply
+  const nA = A.length, nC = m;
+  const AtA2 = [];
+  for (let i=0;i<nC;i++){
+    AtA2[i]=[];
+    for(let j=0;j<nC;j++){
+      let s=0; for(let k=0;k<nA;k++) s+=A[k][i]*A[k][j];
+      AtA2[i][j]=s;
+    }
+  }
+  const Atb = [];
+  for(let i=0;i<nC;i++){
+    let s=0; for(let k=0;k<nA;k++) s+=A[k][i]*ys[k];
+    Atb[i]=s;
+  }
+  // Gaussian elimination
+  const M = AtA2.map((r,i)=>[...r, Atb[i]]);
+  for(let col=0;col<nC;col++){
+    let maxR=col;
+    for(let r=col+1;r<nC;r++) if(Math.abs(M[r][col])>Math.abs(M[maxR][col])) maxR=r;
+    [M[col],M[maxR]]=[M[maxR],M[col]];
+    const piv=M[col][col]; if(Math.abs(piv)<1e-12) continue;
+    for(let r=0;r<nC;r++){
+      if(r===col) continue;
+      const f=M[r][col]/piv;
+      for(let c=col;c<=nC;c++) M[r][c]-=f*M[col][c];
+    }
+    for(let c=col;c<=nC;c++) M[col][c]/=piv;
+  }
+  return M.map(r=>r[nC]);
+}
+function evalPoly(c, x){ return c.reduce((s,ci,i)=>s+ci*Math.pow(x,i),0); }
+function smoothPts(pts, deg=3, nOut=120){
+  if(pts.length<deg+1) return pts;
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  const c=polyRegress(xs,ys,deg);
+  const x0=Math.min(...xs), x1=Math.max(...xs);
+  const out=[];
+  for(let i=0;i<=nOut;i++){
+    const x=x0+(x1-x0)*i/nOut;
+    out.push({x, y:Math.max(0,evalPoly(c,x))});
+  }
+  return out;
+}
+
 // ── INIT ────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadDB();
@@ -948,31 +1000,43 @@ function drawCharts(test) {
   if (chFC)      { chFC.destroy();      chFC      = null; }
 
   // ── LACTATE ──
-  const lacDS = [{
-    label: 'Lactate (mmol/L)',
-    data: p.map(x => ({ x: x.valeur, y: x.lactate })),
-    borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
-    borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#2563eb',
-    tension: .4, cubicInterpolationMode: 'monotone', fill: true,
-  }];
+  const lacPts = p.map(x => ({ x: x.valeur, y: x.lactate }));
+  const lacSmooth = smoothPts(lacPts, 3, 150);
+
+  const lacDS = [
+    // Smooth trend line (no dots)
+    {
+      label: 'Lactate (mmol/L)',
+      data: lacSmooth,
+      borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
+      borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0,
+    },
+    // Actual data points (dots only, no line)
+    {
+      label: '_points',
+      data: lacPts,
+      borderColor: '#2563eb', backgroundColor: '#2563eb',
+      borderWidth: 0, pointRadius: 5, showLine: false, fill: false,
+    },
+  ];
 
   if (r && p.length >= 2) {
     const f = p[0], l = p[p.length-1];
     lacDS.push({
       label: 'Droite Dmax', data: [{x:f.valeur,y:f.lactate},{x:l.valeur,y:l.lactate}],
-      borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false,
+      borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0,
     });
     lacDS.push({
       label: `LT1 (${r.lt1.valeur} ${un})`,
       data: [{x:r.lt1.valeur,y:0},{x:r.lt1.valeur,y:r.lt1.lactate+.3}],
       borderColor:'#22c55e', borderWidth:2, borderDash:[4,4],
-      pointRadius:[0,8], pointBackgroundColor:'#22c55e', fill:false,
+      pointRadius:[0,8], pointBackgroundColor:'#22c55e', fill:false, tension:0,
     });
     lacDS.push({
       label: `LT2 / Dmax (${r.lt2.valeur} ${un})`,
       data: [{x:r.lt2.valeur,y:0},{x:r.lt2.valeur,y:r.lt2.lactate+.3}],
       borderColor:'#ef4444', borderWidth:2, borderDash:[4,4],
-      pointRadius:[0,8], pointBackgroundColor:'#ef4444', fill:false,
+      pointRadius:[0,8], pointBackgroundColor:'#ef4444', fill:false, tension:0,
     });
   }
 
@@ -984,25 +1048,44 @@ function drawCharts(test) {
         x:{ type:'linear', title:{display:true,text:un==='km/h'?'Vitesse (km/h)':'Puissance (W)'} },
         y:{ title:{display:true,text:'Lactate (mmol/L)'}, min:0 }
       },
-      plugins:{ legend:{ position:'bottom', labels:{boxWidth:12,font:{size:10}} } }
+      plugins:{
+        legend:{
+          position:'bottom', labels:{
+            boxWidth:12, font:{size:10},
+            filter: item => !item.text.startsWith('_'),
+          }
+        }
+      }
     }
   });
 
   // ── FC ──
   const xMin = pFC[0]?.valeur || 0;
   const xMax = pFC[pFC.length-1]?.valeur || 20;
-  const fcDS = [{
-    label: 'FC moyenne (bpm)',
-    data: pFC.map(x => ({ x: x.valeur, y: x.fc })),
-    borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,.07)',
-    borderWidth: 2.5, pointRadius: 5, pointBackgroundColor: '#1e3a5f',
-    tension: .4, cubicInterpolationMode: 'monotone', fill: true,
-  }];
+  const fcPts = pFC.map(x => ({ x: x.valeur, y: x.fc }));
+  const fcSmooth = smoothPts(fcPts, 2, 150);
+
+  const fcDS = [
+    // Smooth trend line
+    {
+      label: 'FC moyenne (bpm)',
+      data: fcSmooth,
+      borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,.07)',
+      borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0,
+    },
+    // Actual data points
+    {
+      label: '_fcpts',
+      data: fcPts,
+      borderColor: '#1e3a5f', backgroundColor: '#1e3a5f',
+      borderWidth: 0, pointRadius: 5, showLine: false, fill: false,
+    },
+  ];
 
   if (r) {
-    fcDS.push({ label:`FC LT1 (${r.lt1.fc} bpm)`, data:[{x:xMin,y:r.lt1.fc},{x:xMax,y:r.lt1.fc}], borderColor:'#22c55e', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false });
-    fcDS.push({ label:`FC LT2 (${r.lt2.fc} bpm)`, data:[{x:xMin,y:r.lt2.fc},{x:xMax,y:r.lt2.fc}], borderColor:'#ef4444', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false });
-    fcDS.push({ label:`FC max (${r.fcMax} bpm)`,  data:[{x:xMin,y:r.fcMax},{x:xMax,y:r.fcMax}],   borderColor:'#94a3b8', borderWidth:1,   borderDash:[3,3], pointRadius:0, fill:false });
+    fcDS.push({ label:`FC LT1 (${r.lt1.fc} bpm)`, data:[{x:xMin,y:r.lt1.fc},{x:xMax,y:r.lt1.fc}], borderColor:'#22c55e', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0 });
+    fcDS.push({ label:`FC LT2 (${r.lt2.fc} bpm)`, data:[{x:xMin,y:r.lt2.fc},{x:xMax,y:r.lt2.fc}], borderColor:'#ef4444', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0 });
+    fcDS.push({ label:`FC max (${r.fcMax} bpm)`,  data:[{x:xMin,y:r.fcMax},{x:xMax,y:r.fcMax}],   borderColor:'#94a3b8', borderWidth:1,   borderDash:[3,3], pointRadius:0, fill:false, tension:0 });
   }
 
   chFC = new Chart(document.getElementById('ch-fc'), {
@@ -1013,7 +1096,14 @@ function drawCharts(test) {
         x:{ type:'linear', title:{display:true,text:un==='km/h'?'Vitesse (km/h)':'Puissance (W)'} },
         y:{ title:{display:true,text:'Fréquence cardiaque (bpm)'}, min:0 }
       },
-      plugins:{ legend:{ position:'bottom', labels:{boxWidth:12,font:{size:10}} } }
+      plugins:{
+        legend:{
+          position:'bottom', labels:{
+            boxWidth:12, font:{size:10},
+            filter: item => !item.text.startsWith('_'),
+          }
+        }
+      }
     }
   });
 }
@@ -1109,26 +1199,30 @@ async function buildPDF(cl, test) {
   doc.text(String(test.paliers.length), M+136, 71.5);
   doc.setFont(undefined,'normal');
 
-  // Charts from canvas — stacked vertically
-  const chY = 82, chH = 90, chGap = 8;
+  // Charts from canvas — stacked vertically, aspect ratio preserved
+  const chY = 82, chGap = 8;
 
   const lacCanvas = document.getElementById('ch-lactate');
   const fcCanvas  = document.getElementById('ch-fc');
+
+  // Compute heights from real canvas aspect ratios
+  const lacH = lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 85;
+  const fcH  = fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 85;
 
   doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
   doc.text('COURBE LACTATE', M, chY - 2);
   doc.setFont(undefined,'normal');
   if (lacCanvas && chLactate) {
-    doc.addImage(lacCanvas.toDataURL('image/png'), 'PNG', M, chY, CW, chH);
-  } else { pdfChartPlaceholder(doc, M, chY, CW, chH, 'Courbe Lactate'); }
+    doc.addImage(lacCanvas.toDataURL('image/png', 1.0), 'PNG', M, chY, CW, lacH);
+  } else { pdfChartPlaceholder(doc, M, chY, CW, 85, 'Courbe Lactate'); }
 
-  const chY2 = chY + chH + chGap;
+  const chY2 = chY + lacH + chGap;
   doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
   doc.text('COURBE FRÉQUENCE CARDIAQUE', M, chY2 - 2);
   doc.setFont(undefined,'normal');
   if (fcCanvas && chFC) {
-    doc.addImage(fcCanvas.toDataURL('image/png'), 'PNG', M, chY2, CW, chH);
-  } else { pdfChartPlaceholder(doc, M, chY2, CW, chH, 'Courbe FC'); }
+    doc.addImage(fcCanvas.toDataURL('image/png', 1.0), 'PNG', M, chY2, CW, fcH);
+  } else { pdfChartPlaceholder(doc, M, chY2, CW, 85, 'Courbe FC'); }
 
   // ── PAGE 2 ──────────────────────────────────────────
   doc.addPage();
