@@ -799,9 +799,10 @@ function computeZones(valid, fcMax) {
   const sp_z1max = round1(sp1 * 0.9);
   const sp_z3max = round1(sp2 - 0.15*(sp2-sp1));
   const sp_z4max = round1(sp2 + 0.5*(sp2-sp1));
-  const sp_z5max = round1(sp2 * 1.12);
-  const sp_z6max = round1(sp2 * 1.28);
-  const sp_z7max = round1(sp2 * 1.5);
+  const vma      = round1(valid[valid.length-1].valeur + 1); // dernier palier + 1 km/h = VMA
+  const sp_z5max = vma;
+  const sp_z6max = round1(vma * 1.30);
+  const sp_z7max = round1(vma * 1.50);
 
   const zones = [
     { id:'Z1', nom:'Récupération active',    minHR:z1minHR,   maxHR:z1maxHR,   minSp:sp_z1min,    maxSp:sp_z1max,    col:'#3b82f6' },
