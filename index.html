@@ -433,57 +433,7 @@ let formResultats = null;    // computed zones for current form
 let chLactate = null;
 let chFC = null;
 
-// ── Polynomial regression helpers ────────────────────
-function polyRegress(xs, ys, deg) {
-  const n = xs.length, m = deg + 1;
-  // Build normal equations A^T A x = A^T y
-  const A = Array.from({length:n}, (_,i) => Array.from({length:m}, (_,j) => Math.pow(xs[i],j)));
-  const At = A[0].map((_,j) => A.map(r => r[j]));
-  const AtA = At.map(r => At[0].map((_,j) => r.reduce((s,_,k) => s + r[k]*At[j][k], 0)));
-  // Actually use simpler matrix multiply
-  const nA = A.length, nC = m;
-  const AtA2 = [];
-  for (let i=0;i<nC;i++){
-    AtA2[i]=[];
-    for(let j=0;j<nC;j++){
-      let s=0; for(let k=0;k<nA;k++) s+=A[k][i]*A[k][j];
-      AtA2[i][j]=s;
-    }
-  }
-  const Atb = [];
-  for(let i=0;i<nC;i++){
-    let s=0; for(let k=0;k<nA;k++) s+=A[k][i]*ys[k];
-    Atb[i]=s;
-  }
-  // Gaussian elimination
-  const M = AtA2.map((r,i)=>[...r, Atb[i]]);
-  for(let col=0;col<nC;col++){
-    let maxR=col;
-    for(let r=col+1;r<nC;r++) if(Math.abs(M[r][col])>Math.abs(M[maxR][col])) maxR=r;
-    [M[col],M[maxR]]=[M[maxR],M[col]];
-    const piv=M[col][col]; if(Math.abs(piv)<1e-12) continue;
-    for(let r=0;r<nC;r++){
-      if(r===col) continue;
-      const f=M[r][col]/piv;
-      for(let c=col;c<=nC;c++) M[r][c]-=f*M[col][c];
-    }
-    for(let c=col;c<=nC;c++) M[col][c]/=piv;
-  }
-  return M.map(r=>r[nC]);
-}
-function evalPoly(c, x){ return c.reduce((s,ci,i)=>s+ci*Math.pow(x,i),0); }
-function smoothPts(pts, deg=3, nOut=120){
-  if(pts.length<deg+1) return pts;
-  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
-  const c=polyRegress(xs,ys,deg);
-  const x0=Math.min(...xs), x1=Math.max(...xs);
-  const out=[];
-  for(let i=0;i<=nOut;i++){
-    const x=x0+(x1-x0)*i/nOut;
-    out.push({x, y:Math.max(0,evalPoly(c,x))});
-  }
-  return out;
-}
+// (smooth curves handled directly by Chart.js tension/monotone)
 
 // ── INIT ────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -1001,19 +951,17 @@ function drawCharts(test) {
 
   // ── LACTATE ──
   const lacPts = p.map(x => ({ x: x.valeur, y: x.lactate }));
-  // Smooth trend via polynomial regression (150 interpolated pts)
-  const lacSmooth = smoothPts(lacPts, 3, 150);
 
   const lacDS = [
-    // Smooth trend line (monotone bezier, no dots on line)
+    // Smooth curve (monotone bezier, no dots on line)
     {
       label: 'Lactate (mmol/L)',
-      data: lacSmooth,
+      data: lacPts,
       borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
       borderWidth: 2.5, pointRadius: 0, fill: true,
       tension: 0.4, cubicInterpolationMode: 'monotone',
     },
-    // Actual data points (dots only, no line)
+    // Actual data points (dots only, no connecting line)
     {
       label: '_points',
       data: lacPts,
@@ -1065,13 +1013,12 @@ function drawCharts(test) {
   const xMin = pFC[0]?.valeur || 0;
   const xMax = pFC[pFC.length-1]?.valeur || 20;
   const fcPts = pFC.map(x => ({ x: x.valeur, y: x.fc }));
-  const fcSmooth = smoothPts(fcPts, 2, 150);
 
   const fcDS = [
-    // Smooth trend line
+    // Smooth curve
     {
       label: 'FC moyenne (bpm)',
-      data: fcSmooth,
+      data: fcPts,
       borderColor: '#1e3a5f', backgroundColor: 'rgba(30,58,95,.07)',
       borderWidth: 2.5, pointRadius: 0, fill: true,
       tension: 0.4, cubicInterpolationMode: 'monotone',
