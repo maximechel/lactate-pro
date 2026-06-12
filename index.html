@@ -657,6 +657,19 @@ function defaultPaliers() {
   return Array.from({length:11}, (_,i) => ({ rang:i, valeur: i===0?0:null, fc:null, lactate:null }));
 }
 
+function autoFillSpeeds(fromIdx) {
+  const m = document.getElementById('f-modalite').value;
+  if (m !== 'Tapis roulant') return;
+  const baseVal = formPaliers[fromIdx]?.valeur;
+  if (baseVal === null || isNaN(baseVal)) return;
+  for (let i = fromIdx + 1; i < formPaliers.length; i++) {
+    const v = Math.round((baseVal + (i - fromIdx) * 1.2) * 10) / 10;
+    formPaliers[i].valeur = v;
+    const inp = document.getElementById(`pv-${i}`);
+    if (inp) inp.value = v;
+  }
+}
+
 function onModalChange() {
   const m = document.getElementById('f-modalite').value;
   document.getElementById('th-valeur').textContent = m === 'Tapis roulant' ? 'Vitesse (km/h)' : 'Puissance (W)';
@@ -672,7 +685,7 @@ function renderPaliersForm() {
       <td>
         <input class="stage-inp" id="pv-${i}" type="number" value="${p.valeur!==null?p.valeur:''}"
           placeholder="—" step="${isSpeed?'.1':'10'}"
-          onchange="formPaliers[${i}].valeur=this.value===''?null:parseFloat(this.value)"
+          onchange="formPaliers[${i}].valeur=this.value===''?null:parseFloat(this.value); if(${i}===1) autoFillSpeeds(1);"
           ${p.rang===0?'readonly style="background:#f8fafc;color:var(--muted)"':''}>
       </td>
       <td>
@@ -1175,8 +1188,9 @@ async function buildPDF(cl, test) {
   const lacStartY = doc.lastAutoTable.finalY + 8;
   const lacCanvas = document.getElementById('ch-lactate');
   const fcCanvas  = document.getElementById('ch-fc');
-  const lacH = lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 80;
-  const fcH  = fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 80;
+  const maxLacH = H - 18 - lacStartY; // leave room for footer
+  const lacH = Math.min(lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 80, maxLacH);
+  const fcH  = Math.min(fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 80, 90);
 
   doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
   doc.text('COURBE LACTATE', M, lacStartY - 2);
