@@ -1149,30 +1149,41 @@ async function buildPDF(cl, test) {
   doc.text(String(test.paliers.length), M+136, 71.5);
   doc.setFont(undefined,'normal');
 
-  // Charts from canvas — stacked vertically, aspect ratio preserved
-  const chY = 82, chGap = 8;
+  // ── PALIERS TABLE ───────────────────────────────────
+  const palLabel = 'DONNÉES DES PALIERS';
+  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
+  doc.text(palLabel, M, 82);
+  doc.setFont(undefined,'normal');
 
+  doc.autoTable({
+    head: [['Palier', `${un}`, 'FC moy. (bpm)', 'Lactate (mmol/L)']],
+    body: test.paliers.map((p, i) => [
+      String(i),
+      p.valeur !== null ? String(p.valeur) : '—',
+      p.fc     !== null ? String(p.fc)     : '—',
+      p.lactate !== null ? String(p.lactate) : '—',
+    ]),
+    startY: 85,
+    theme: 'grid',
+    headStyles: { fillColor:[30,58,95], textColor:[255,255,255], fontStyle:'bold', fontSize:8, halign:'center' },
+    bodyStyles: { fontSize:8, halign:'center', cellPadding:2 },
+    alternateRowStyles: { fillColor:[248,250,252] },
+    margin: { left:M, right:M },
+  });
+
+  // ── LACTATE CHART ────────────────────────────────────
+  const lacStartY = doc.lastAutoTable.finalY + 8;
   const lacCanvas = document.getElementById('ch-lactate');
   const fcCanvas  = document.getElementById('ch-fc');
-
-  // Compute heights from real canvas aspect ratios
-  const lacH = lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 85;
-  const fcH  = fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 85;
+  const lacH = lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 80;
+  const fcH  = fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 80;
 
   doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
-  doc.text('COURBE LACTATE', M, chY - 2);
+  doc.text('COURBE LACTATE', M, lacStartY - 2);
   doc.setFont(undefined,'normal');
   if (lacCanvas && chLactate) {
-    doc.addImage(lacCanvas.toDataURL('image/png', 1.0), 'PNG', M, chY, CW, lacH);
-  } else { pdfChartPlaceholder(doc, M, chY, CW, 85, 'Courbe Lactate'); }
-
-  const chY2 = chY + lacH + chGap;
-  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
-  doc.text('COURBE FRÉQUENCE CARDIAQUE', M, chY2 - 2);
-  doc.setFont(undefined,'normal');
-  if (fcCanvas && chFC) {
-    doc.addImage(fcCanvas.toDataURL('image/png', 1.0), 'PNG', M, chY2, CW, fcH);
-  } else { pdfChartPlaceholder(doc, M, chY2, CW, 85, 'Courbe FC'); }
+    doc.addImage(lacCanvas.toDataURL('image/png', 1.0), 'PNG', M, lacStartY, CW, lacH);
+  } else { pdfChartPlaceholder(doc, M, lacStartY, CW, 80, 'Courbe Lactate'); }
 
   // ── PAGE 2 ──────────────────────────────────────────
   doc.addPage();
@@ -1182,11 +1193,21 @@ async function buildPDF(cl, test) {
   if (logo) { try { const lf = logo.startsWith('data:image/jpeg')||logo.startsWith('data:image/jpg')?'JPEG':'PNG'; doc.addImage(logo,lf,M,3,20,16,'','FAST'); } catch{} }
   doc.setTextColor(255,255,255);
   doc.setFontSize(13); doc.setFont(undefined,'bold');
-  doc.text('ZONES D\'INTENSITÉ', W/2, 10, {align:'center'});
+  doc.text('ANALYSE & ZONES D\'INTENSITÉ', W/2, 10, {align:'center'});
   doc.setFontSize(8); doc.setFont(undefined,'normal');
   doc.text(`${cl.nom} — ${fmtDate(test.date)}`, W/2, 17, {align:'center'});
 
-  // Table
+  // FC chart on page 2
+  doc.setTextColor(30,58,95); doc.setFontSize(7.5); doc.setFont(undefined,'bold');
+  doc.text('COURBE FRÉQUENCE CARDIAQUE', M, 27);
+  doc.setFont(undefined,'normal');
+  if (fcCanvas && chFC) {
+    doc.addImage(fcCanvas.toDataURL('image/png', 1.0), 'PNG', M, 30, CW, fcH);
+  } else { pdfChartPlaceholder(doc, M, 30, CW, 80, 'Courbe FC'); }
+
+  const zonesStartY = 30 + fcH + 10;
+
+  // Zones table
   doc.autoTable({
     head: [['Zone','Nom',`${un} min`,`${un} max`,'FC min (bpm)','FC max (bpm)']],
     body: r.zones.map(z => [
@@ -1194,7 +1215,7 @@ async function buildPDF(cl, test) {
       String(z.minSp), String(z.maxSp),
       z.minHR ?? '—', z.maxHR ?? '—',
     ]),
-    startY: 27,
+    startY: zonesStartY,
     theme: 'grid',
     headStyles: { fillColor:[30,58,95], textColor:[255,255,255], fontStyle:'bold', fontSize:9, halign:'center' },
     bodyStyles: { fontSize:9.5, halign:'center', cellPadding:3 },
