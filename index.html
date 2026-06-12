@@ -808,7 +808,7 @@ function computeZones(valid, fcMax) {
 
   const zones = [
     { id:'Z1', nom:'Échauffement',                    minHR:z1minHR,   maxHR:z1maxHR,   minSp:sp_z1min,    maxSp:sp_z1max,    col:'#3b82f6' },
-    { id:'Z2', nom:'Endurance fondamentale (Seuil 1)', minHR:z1maxHR,  maxHR:fc1,       minSp:sp_z1max,    maxSp:round1(sp1), col:'#22c55e' },
+    { id:'Z2', nom:'Endurance fondamentale\n(Seuil 1)', minHR:z1maxHR,  maxHR:fc1,       minSp:sp_z1max,    maxSp:round1(sp1), col:'#22c55e' },
     { id:'Z3', nom:'Tempo',                           minHR:fc1,       maxHR:z3maxHR,   minSp:round1(sp1), maxSp:sp_z3max,    col:'#eab308' },
     { id:'Z4', nom:'Seuil 2',                         minHR:z3maxHR,   maxHR:z4maxHR,   minSp:sp_z3max,    maxSp:sp_z4max,    col:'#f97316' },
     { id:'Z5', nom:'VO2max',                  minHR:z4maxHR,   maxHR:fcMax,     minSp:sp_z4max,    maxSp:sp_z5max,    col:'#ef4444' },
