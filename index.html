@@ -772,6 +772,49 @@ function calcZones() {
   );
 }
 
+// ── Régression polynomiale (degré 3) pour la courbe ajustée / ModDmax ──
+function polyFit(xs, ys, deg) {
+  const n = xs.length;
+  const xMean = xs.reduce((a,b)=>a+b,0) / n;
+  const xStd  = Math.sqrt(xs.reduce((s,x)=>s+(x-xMean)**2,0) / n) || 1;
+  const xn = xs.map(x => (x - xMean) / xStd);
+  const m = deg + 1;
+  const A = xn.map(x => Array.from({length:m}, (_,j) => Math.pow(x,j)));
+  const AtA = Array.from({length:m}, (_,i) => Array.from({length:m}, (_,j) => A.reduce((s,row)=>s+row[i]*row[j],0)));
+  const Atb = Array.from({length:m}, (_,i) => A.reduce((s,row,k)=>s+row[i]*ys[k],0));
+  return { coeffs: solveLinear(AtA, Atb), xMean, xStd };
+}
+function evalFit(model, x) {
+  const xn = (x - model.xMean) / model.xStd;
+  return model.coeffs.reduce((s,c,i)=>s+c*Math.pow(xn,i), 0);
+}
+function solveLinear(A, b) {
+  const n = A.length;
+  const M = A.map((row,i) => [...row, b[i]]);
+  for (let col=0; col<n; col++) {
+    let piv = col;
+    for (let r=col+1; r<n; r++) if (Math.abs(M[r][col]) > Math.abs(M[piv][col])) piv = r;
+    [M[col], M[piv]] = [M[piv], M[col]];
+    const pv = M[col][col];
+    if (Math.abs(pv) < 1e-12) continue;
+    for (let r=0; r<n; r++) {
+      if (r === col) continue;
+      const f = M[r][col] / pv;
+      for (let c=col; c<=n; c++) M[r][c] -= f*M[col][c];
+    }
+  }
+  return M.map((row,i) => row[n] / row[i]);
+}
+function interpAt(valid, x, key) {
+  for (let i=0; i<valid.length-1; i++) {
+    if (x >= valid[i].valeur && x <= valid[i+1].valeur) {
+      const t = (x - valid[i].valeur) / (valid[i+1].valeur - valid[i].valeur);
+      return valid[i][key] + t*(valid[i+1][key] - valid[i][key]);
+    }
+  }
+  return x <= valid[0].valeur ? valid[0][key] : valid[valid.length-1][key];
+}
+
 function computeZones(valid, fcMax) {
   const baseLactate = valid[0].lactate;
 
@@ -781,26 +824,40 @@ function computeZones(valid, fcMax) {
     if (valid[i].lactate <= baseLactate + 0.4) lt1i = i; else break;
   }
 
-  // — LT2 / Dmax à partir de LT1
+  // — Courbe ajustée (régression polynomiale degré 3) + LT2 / ModDmax
   const seg = valid.slice(lt1i);
-  let lt2i = lt1i;
-  if (seg.length >= 3) {
-    const f = seg[0], l = seg[seg.length-1];
-    const dx = l.valeur - f.valeur, dy = l.lactate - f.lactate;
-    const a = dy, b = -dx, c = -dy*f.valeur + dx*f.lactate;
+  const sp1 = valid[lt1i].valeur, fc1v = valid[lt1i].fc, lt1Lactate = valid[lt1i].lactate;
+  let sp2, fc2v, lt2Lactate, fitCurve = null, dmaxLine = null;
+
+  if (seg.length >= 4) {
+    const xs = seg.map(s=>s.valeur), ys = seg.map(s=>s.lactate);
+    const model = polyFit(xs, ys, 3);
+    const x0 = xs[0], x1 = xs[xs.length-1];
+    const y0 = Math.max(0, evalFit(model, x0)), y1 = Math.max(0, evalFit(model, x1));
+    const dx = x1-x0, dy = y1-y0;
+    const a = dy, b = -dx, c = -dy*x0 + dx*y0;
     const denom = Math.sqrt(a*a + b*b);
-    let maxD = -1;
-    for (let i = 1; i < seg.length - 1; i++) {
-      const d = denom > 0 ? Math.abs(a*seg[i].valeur + b*seg[i].lactate + c) / denom : 0;
-      if (d > maxD) { maxD = d; lt2i = lt1i + i; }
+
+    const nPts = 100;
+    fitCurve = [];
+    let maxD = -1, bestX = x0;
+    for (let i = 0; i <= nPts; i++) {
+      const x = x0 + (x1-x0)*i/nPts;
+      const y = Math.max(0, evalFit(model, x));
+      fitCurve.push({ x, y });
+      const d = denom > 0 ? Math.abs(a*x + b*y + c) / denom : 0;
+      if (d > maxD) { maxD = d; bestX = x; }
     }
+    sp2 = round1(bestX);
+    lt2Lactate = Math.round(Math.max(0, evalFit(model, bestX)) * 10) / 10;
+    fc2v = Math.round(interpAt(valid, bestX, 'fc'));
+    dmaxLine = [{x:x0,y:y0},{x:x1,y:y1}];
   } else {
-    lt2i = valid.length - 1;
+    const last = seg[seg.length-1];
+    sp2 = last.valeur; fc2v = last.fc; lt2Lactate = last.lactate;
   }
 
-  const lt1 = valid[lt1i], lt2 = valid[lt2i];
-  const [fc1, fc2] = [lt1.fc, lt2.fc];
-  const [sp1, sp2] = [lt1.valeur, lt2.valeur];
+  const [fc1, fc2] = [fc1v, fc2v];
 
   // — HR zones
   const z1maxHR  = Math.round(2*fc1 - fc2);
@@ -830,10 +887,11 @@ function computeZones(valid, fcMax) {
   ];
 
   return {
-    lt1:{ rang:lt1i, valeur:round1(sp1), fc:fc1, lactate:lt1.lactate },
-    lt2:{ rang:lt2i, valeur:round1(sp2), fc:fc2, lactate:lt2.lactate },
+    lt1:{ rang:lt1i, valeur:round1(sp1), fc:fc1, lactate:lt1Lactate },
+    lt2:{ valeur:round1(sp2), fc:fc2, lactate:lt2Lactate },
     fcMax, zones,
     paliers: valid,
+    fitCurve, dmaxLine,
   };
 }
 
@@ -966,29 +1024,47 @@ function drawCharts(test) {
   const lacPts = p.map(x => ({ x: x.valeur, y: x.lactate }));
 
   const lacDS = [
-    // Smooth curve (monotone bezier, no dots on line)
+    // Données mesurées (points seuls, sans ligne)
     {
+      label: 'Données',
+      data: lacPts,
+      borderColor: '#1e293b', backgroundColor: '#fff',
+      borderWidth: 2, pointRadius: 5, showLine: false, fill: false,
+    },
+  ];
+
+  if (r && r.fitCurve) {
+    // Courbe ajustée (régression polynomiale degré 3, façon ModDmax)
+    lacDS.push({
+      label: 'Courbe ajustée',
+      data: r.fitCurve,
+      borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
+      borderWidth: 2.5, pointRadius: 0, fill: true, tension: 0,
+    });
+  } else {
+    // Pas assez de points pour l'ajustement : courbe lissée brute
+    lacDS.push({
       label: 'Lactate (mmol/L)',
       data: lacPts,
       borderColor: '#2563eb', backgroundColor: 'rgba(37,99,235,.08)',
       borderWidth: 2.5, pointRadius: 0, fill: true,
       tension: 0.4, cubicInterpolationMode: 'monotone',
-    },
-    // Actual data points (dots only, no connecting line)
-    {
-      label: '_points',
-      data: lacPts,
-      borderColor: '#fff', backgroundColor: '#2563eb',
-      borderWidth: 2, pointRadius: 5, showLine: false, fill: false,
-    },
-  ];
-
-  if (r && p.length >= 2) {
-    const f = p[0], l = p[p.length-1];
-    lacDS.push({
-      label: 'Droite Dmax', data: [{x:f.valeur,y:f.lactate},{x:l.valeur,y:l.lactate}],
-      borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0,
     });
+  }
+
+  if (r) {
+    if (r.dmaxLine) {
+      lacDS.push({
+        label: 'Droite Dmax', data: r.dmaxLine,
+        borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0,
+      });
+    } else if (p.length >= 2) {
+      const f = p[0], l = p[p.length-1];
+      lacDS.push({
+        label: 'Droite Dmax', data: [{x:f.valeur,y:f.lactate},{x:l.valeur,y:l.lactate}],
+        borderColor:'#94a3b8', borderWidth:1.5, borderDash:[5,5], pointRadius:0, fill:false, tension:0,
+      });
+    }
     lacDS.push({
       label: `LT1 (${r.lt1.valeur} ${un})`,
       data: [{x:r.lt1.valeur,y:0},{x:r.lt1.valeur,y:r.lt1.lactate+.3}],
@@ -996,7 +1072,7 @@ function drawCharts(test) {
       pointRadius:[0,8], pointBackgroundColor:'#22c55e', fill:false, tension:0,
     });
     lacDS.push({
-      label: `LT2 / Dmax (${r.lt2.valeur} ${un})`,
+      label: `LT2 / ModDmax (${r.lt2.valeur} ${un})`,
       data: [{x:r.lt2.valeur,y:0},{x:r.lt2.valeur,y:r.lt2.lactate+.3}],
       borderColor:'#ef4444', borderWidth:2, borderDash:[4,4],
       pointRadius:[0,8], pointBackgroundColor:'#ef4444', fill:false, tension:0,
