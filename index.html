@@ -378,15 +378,15 @@ tbody tr:hover td { background: #f8fafc; }
 <!-- ── MODAL: NOUVEAU CLIENT ── -->
 <div id="modal-client" class="overlay" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal">
-    <h2>Nouveau client</h2>
+    <h2 id="modal-client-title">Nouveau client</h2>
     <div class="grid-2">
       <div class="form-group" style="grid-column:span 2">
         <label class="form-label">Nom complet *</label>
         <input type="text" id="m-nom" class="form-control" placeholder="ex : Benjamin NOYER">
       </div>
       <div class="form-group">
-        <label class="form-label">Âge</label>
-        <input type="number" id="m-age" class="form-control" placeholder="26" min="10" max="80">
+        <label class="form-label">Date de naissance</label>
+        <input type="date" id="m-naissance" class="form-control">
       </div>
       <div class="form-group">
         <label class="form-label">Sexe</label>
@@ -406,7 +406,7 @@ tbody tr:hover td { background: #f8fafc; }
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="document.getElementById('modal-client').style.display='none'">Annuler</button>
-      <button class="btn btn-primary" onclick="createClient()">Créer</button>
+      <button class="btn btn-primary" id="modal-client-save" onclick="createClient()">Créer</button>
     </div>
   </div>
 </div>
@@ -428,6 +428,7 @@ let DB = { clients: [] };   // main data
 let logo = null;             // base64 logo
 let curClientId = null;
 let curTestId   = null;
+let editClientId = null;
 let formPaliers = [];        // working paliers array for form
 let formResultats = null;    // computed zones for current form
 let chLactate = null;
@@ -531,23 +532,55 @@ function renderClients() {
     el.innerHTML = `<div class="empty"><div class="ei">👤</div><h3>Aucun client</h3><p>Commence par créer un client.</p></div>`;
     return;
   }
-  el.innerHTML = DB.clients.map(c => `
+  el.innerHTML = DB.clients.map(c => {
+    const age = getClientAge(c);
+    return `
     <div class="client-card" onclick="openClient('${c.id}')">
       <div class="avatar">${initials(c.nom)}</div>
       <div class="client-info">
         <h3>${c.nom}</h3>
-        <p>${c.age ? c.age+' ans ·' : ''} ${c.poids ? c.poids+' kg ·' : ''} ${c.taille ? c.taille+' cm ·' : ''} ${c.sexe === 'F' ? 'Femme' : 'Homme'}</p>
+        <p>${age ? age+' ans ·' : ''} ${c.poids ? c.poids+' kg ·' : ''} ${c.taille ? c.taille+' cm ·' : ''} ${c.sexe === 'F' ? 'Femme' : 'Homme'}</p>
       </div>
       <div class="client-card-right">
         <span>${(c.tests||[]).length} test(s)</span>
+        <button class="btn-icon" onclick="event.stopPropagation();openModalClient('${c.id}')" title="Modifier">✏️</button>
         <button class="btn-icon" onclick="event.stopPropagation();deleteClient('${c.id}')" title="Supprimer">🗑</button>
         <span style="font-size:1.1rem;color:var(--border)">›</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
-function openModalClient() {
-  ['m-nom','m-age','m-poids','m-taille'].forEach(id => document.getElementById(id).value = '');
+// — Âge calculé dynamiquement à partir de la date de naissance —
+function computeAge(dateNaissance) {
+  if (!dateNaissance) return null;
+  const dob = new Date(dateNaissance);
+  if (isNaN(dob.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  return age;
+}
+
+function getClientAge(c) {
+  if (c.dateNaissance) return computeAge(c.dateNaissance);
+  return c.age || null; // compat clients existants saisis avec un âge fixe
+}
+
+function openModalClient(id) {
+  editClientId = id || null;
+  const c = editClientId ? DB.clients.find(x => x.id === editClientId) : null;
+
+  document.getElementById('modal-client-title').textContent = c ? 'Modifier client' : 'Nouveau client';
+  document.getElementById('modal-client-save').textContent  = c ? 'Enregistrer' : 'Créer';
+
+  document.getElementById('m-nom').value       = c?.nom || '';
+  document.getElementById('m-naissance').value = c?.dateNaissance || '';
+  document.getElementById('m-sexe').value      = c?.sexe || 'H';
+  document.getElementById('m-poids').value     = c?.poids || '';
+  document.getElementById('m-taille').value    = c?.taille || '';
+
   document.getElementById('modal-client').style.display = 'flex';
   setTimeout(() => document.getElementById('m-nom').focus(), 80);
 }
@@ -555,15 +588,26 @@ function openModalClient() {
 function createClient() {
   const nom = document.getElementById('m-nom').value.trim();
   if (!nom) { alert('Nom requis.'); return; }
-  const c = {
-    id: uid(), nom,
-    age:    parseInt(document.getElementById('m-age').value)   || 0,
+  const data = {
+    nom,
+    dateNaissance: document.getElementById('m-naissance').value || null,
     sexe:   document.getElementById('m-sexe').value,
     poids:  parseFloat(document.getElementById('m-poids').value) || 0,
     taille: parseInt(document.getElementById('m-taille').value) || 0,
-    tests:  []
   };
-  DB.clients.push(c); saveDB();
+
+  if (editClientId) {
+    const c = DB.clients.find(x => x.id === editClientId);
+    if (c) {
+      Object.assign(c, data);
+      if (data.dateNaissance) delete c.age; // la date de naissance prime désormais
+    }
+  } else {
+    DB.clients.push({ id: uid(), ...data, tests: [] });
+  }
+
+  saveDB();
+  editClientId = null;
   document.getElementById('modal-client').style.display = 'none';
   renderClients();
 }
@@ -585,8 +629,9 @@ function renderTests() {
   document.getElementById('v-tests-title').textContent = cl.nom;
 
   // Client summary chips
+  const clAge = getClientAge(cl);
   document.getElementById('client-summary').innerHTML = [
-    cl.age    ? `<div class="stat-chip" style="border-left-color:var(--blue)"><div class="sc-label">Âge</div><div class="sc-val">${cl.age}<span class="sc-unit">ans</span></div></div>` : '',
+    clAge     ? `<div class="stat-chip" style="border-left-color:var(--blue)"><div class="sc-label">Âge</div><div class="sc-val">${clAge}<span class="sc-unit">ans</span></div></div>` : '',
     cl.poids  ? `<div class="stat-chip" style="border-left-color:var(--sky)"><div class="sc-label">Poids</div><div class="sc-val">${cl.poids}<span class="sc-unit">kg</span></div></div>` : '',
     cl.taille ? `<div class="stat-chip" style="border-left-color:var(--navy)"><div class="sc-label">Taille</div><div class="sc-val">${cl.taille}<span class="sc-unit">cm</span></div></div>` : '',
   ].join('');
@@ -1200,7 +1245,8 @@ async function buildPDF(cl, test) {
   doc.setFillColor(248,250,252); doc.setDrawColor(226,232,240);
   doc.roundedRect(M, 34, CW, 20, 2, 2, 'FD');
   const labels6  = ['CLIENT','ÂGE','POIDS','TAILLE','MODALITÉ','FC MAX'];
-  const values6  = [cl.nom, cl.age?cl.age+' ans':'—', cl.poids?cl.poids+' kg':'—', cl.taille?cl.taille+' cm':'—', test.modalite, r.fcMax+' bpm'];
+  const clAge6 = getClientAge(cl);
+  const values6  = [cl.nom, clAge6?clAge6+' ans':'—', cl.poids?cl.poids+' kg':'—', cl.taille?cl.taille+' cm':'—', test.modalite, r.fcMax+' bpm'];
   const xPos = [M+3, M+50, M+73, M+96, M+120, M+162];
   doc.setTextColor(100,116,139); doc.setFontSize(6.5);
   labels6.forEach((l,i) => doc.text(l, xPos[i], 40));
