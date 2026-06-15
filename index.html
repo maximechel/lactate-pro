@@ -861,12 +861,13 @@ function interpAt(valid, x, key) {
 }
 
 function computeZones(valid, fcMax) {
-  const baseLactate = valid[0].lactate;
-
-  // — LT1 : dernier palier où lactate ≤ baseline + 0.4
-  let lt1i = 0;
-  for (let i = 0; i < valid.length; i++) {
-    if (valid[i].lactate <= baseLactate + 0.4) lt1i = i; else break;
+  // — LT1 : dernier palier (à partir du palier 1) où lactate ≤ lactate(palier 1) + 0.5
+  //   Le palier 0 (repos) n'entre pas dans ce calcul mais reste conservé pour les zones.
+  const ref = valid.length > 1 ? 1 : 0;
+  const baseLactate = valid[ref].lactate;
+  let lt1i = ref;
+  for (let i = ref; i < valid.length; i++) {
+    if (valid[i].lactate <= baseLactate + 0.5) lt1i = i; else break;
   }
 
   // — Courbe ajustée (régression polynomiale degré 3) + LT2 / ModDmax
@@ -1384,7 +1385,7 @@ async function buildPDF(cl, test) {
   doc.text('Note méthodologique', M, noteY);
   doc.setFont(undefined,'normal'); doc.setFontSize(7.5); doc.setTextColor(100,116,139);
   [
-    `LT1 (Seuil 1) : dernier palier avant que le lactate n'augmente de +0,4 mmol/L.`,
+    `LT1 (Seuil 1) : dernier palier (à partir du palier 1) avant que le lactate n'augmente de +0,5 mmol/L.`,
     `LT2 (Seuil 2) : méthode Dmax — point de distance maximale à la droite reliant le premier et le dernier`,
     `point de la courbe lactate-${un} (à partir de LT1).`,
     `Les zones Z1–Z5 intègrent des plages de fréquence cardiaque et de ${un === 'km/h' ? 'vitesse' : 'puissance'}.`,
