@@ -203,11 +203,13 @@ tbody tr:hover td { background: #f8fafc; }
     </div>
   </div>
   <div class="topbar-right">
+    <button id="btn-logo2" class="btn btn-secondary btn-sm" onclick="document.getElementById('logo2-file').click()" title="Logo pied de page (signature)">🖼 Logo signature</button>
     <button class="btn btn-secondary btn-sm" onclick="exportData()" title="Exporter les données">⬇ Export</button>
     <button class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click()" title="Importer les données">⬆ Import</button>
   </div>
 </nav>
-<input type="file" id="logo-file" accept="image/*" style="display:none">
+<input type="file" id="logo-file"  accept="image/*" style="display:none">
+<input type="file" id="logo2-file" accept="image/*" style="display:none">
 <input type="file" id="import-file" accept=".json" style="display:none">
 
 <!-- BREADCRUMB -->
@@ -421,11 +423,13 @@ tbody tr:hover td { background: #f8fafc; }
 // ════════════════════════════════════════════════════
 //  STATE
 // ════════════════════════════════════════════════════
-const DB_KEY   = 'lactatepro_db';
-const LOGO_KEY = 'lactatepro_logo';
+const DB_KEY    = 'lactatepro_db';
+const LOGO_KEY  = 'lactatepro_logo';
+const LOGO2_KEY = 'lactatepro_logo_footer';
 
 let DB = { clients: [] };   // main data
-let logo = null;             // base64 logo
+let logo  = null;            // logo en-tête
+let logo2 = null;            // logo pied de page (signature)
 let curClientId = null;
 let curTestId   = null;
 let editClientId = null;
@@ -439,8 +443,10 @@ let chFC = null;
 // ── INIT ────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadDB();
-  logo = localStorage.getItem(LOGO_KEY) || null;
+  logo  = localStorage.getItem(LOGO_KEY)  || null;
+  logo2 = localStorage.getItem(LOGO2_KEY) || null;
   applyLogo();
+  if (logo2) { const b = document.getElementById('btn-logo2'); if (b) b.textContent = '✅ Logo signature'; }
   renderClients();
   showView('clients');
 
@@ -448,6 +454,18 @@ window.addEventListener('DOMContentLoaded', () => {
     const f = e.target.files[0]; if (!f) return;
     const r = new FileReader();
     r.onload = ev => { logo = ev.target.result; localStorage.setItem(LOGO_KEY, logo); applyLogo(); };
+    r.readAsDataURL(f);
+  });
+
+  document.getElementById('logo2-file').addEventListener('change', e => {
+    const f = e.target.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      logo2 = ev.target.result;
+      localStorage.setItem(LOGO2_KEY, logo2);
+      const btn = document.getElementById('btn-logo2');
+      if (btn) btn.textContent = '✅ Logo signature';
+    };
     r.readAsDataURL(f);
   });
 
@@ -1230,7 +1248,7 @@ async function buildPDF(cl, test) {
   const W = 210, H = 297, M = 14, CW = W - 2*M;
   const r = test.resultats, un = unite(test.modalite);
 
-  // ── Pré-calcul des dimensions du logo (ratio natif, utilisé sur toutes les pages) ──
+  // ── Pré-calcul des dimensions des logos ──
   let logoFmt = 'PNG', logoPxW = 1, logoPxH = 1;
   if (logo) {
     try {
@@ -1239,9 +1257,20 @@ async function buildPDF(cl, test) {
       logoPxW = w; logoPxH = h;
     } catch{}
   }
-  const logoP1  = fitInBox(logoPxW, logoPxH, 45, 22);   // header page 1
-  const logoP2  = fitInBox(logoPxW, logoPxH, 32, 14);   // header page 2
-  const logoFot = fitInBox(logoPxW, logoPxH, 38, 16);   // pied de page
+  const logoP1 = fitInBox(logoPxW, logoPxH, 45, 22);  // header page 1
+  const logoP2 = fitInBox(logoPxW, logoPxH, 32, 14);  // header page 2
+
+  // Logo signature (pied de page) — logo2 si défini, sinon logo
+  const sigSrc = logo2 || logo;
+  let sigFmt = 'PNG', sigPxW = logoPxW, sigPxH = logoPxH;
+  if (sigSrc && sigSrc !== logo) {
+    try {
+      sigFmt = sigSrc.startsWith('data:image/jpeg')||sigSrc.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+      const { w, h } = await getImgDims(sigSrc);
+      sigPxW = w; sigPxH = h;
+    } catch{}
+  } else { sigFmt = logoFmt; }
+  const logoFot = fitInBox(sigPxW, sigPxH, 40, 16);   // pied de page
 
   // Zone color arrays for autoTable
   const ZAcc = {
@@ -1426,18 +1455,18 @@ async function buildPDF(cl, test) {
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
 
-    // Fond gris très clair
-    doc.setFillColor(247, 249, 252);
+    // Fond blanc
+    doc.setFillColor(255, 255, 255);
     doc.rect(0, fy, W, FH, 'F');
 
     // Ligne de séparation haute
     doc.setDrawColor(210, 218, 230);
     doc.line(0, fy, W, fy);
 
-    // Logo (gauche, centré verticalement)
-    if (logo) {
+    // Logo signature (gauche, centré verticalement)
+    if (sigSrc) {
       try {
-        doc.addImage(logo, logoFmt, M, fy + (FH - logoFot.h) / 2, logoFot.w, logoFot.h, '', 'FAST');
+        doc.addImage(sigSrc, sigFmt, M, fy + (FH - logoFot.h) / 2, logoFot.w, logoFot.h, '', 'FAST');
       } catch{}
     }
 
