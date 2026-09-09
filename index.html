@@ -1230,6 +1230,19 @@ async function buildPDF(cl, test) {
   const W = 210, H = 297, M = 14, CW = W - 2*M;
   const r = test.resultats, un = unite(test.modalite);
 
+  // ── Pré-calcul des dimensions du logo (ratio natif, utilisé sur toutes les pages) ──
+  let logoFmt = 'PNG', logoPxW = 1, logoPxH = 1;
+  if (logo) {
+    try {
+      logoFmt = logo.startsWith('data:image/jpeg')||logo.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
+      const { w, h } = await getImgDims(logo);
+      logoPxW = w; logoPxH = h;
+    } catch{}
+  }
+  const logoP1  = fitInBox(logoPxW, logoPxH, 45, 22);   // header page 1
+  const logoP2  = fitInBox(logoPxW, logoPxH, 32, 14);   // header page 2
+  const logoFot = fitInBox(logoPxW, logoPxH, 38, 16);   // pied de page
+
   // Zone color arrays for autoTable
   const ZAcc = {
     Z1:[59,130,246], Z2:[34,197,94], Z3:[234,179,8],
@@ -1246,12 +1259,7 @@ async function buildPDF(cl, test) {
   doc.rect(0, 0, W, 30, 'F');
 
   if (logo) {
-    try {
-      const logoFmt = logo.startsWith('data:image/jpeg') || logo.startsWith('data:image/jpg') ? 'JPEG' : 'PNG';
-      const { w: lW, h: lH } = await getImgDims(logo);
-      const { w: lWmm, h: lHmm } = fitInBox(lW, lH, 45, 22);
-      doc.addImage(logo, logoFmt, M, (30 - lHmm) / 2, lWmm, lHmm, '', 'FAST');
-    } catch{}
+    try { doc.addImage(logo, logoFmt, M, (30 - logoP1.h) / 2, logoP1.w, logoP1.h, '', 'FAST'); } catch{}
   }
 
   doc.setTextColor(255,255,255);
@@ -1330,7 +1338,7 @@ async function buildPDF(cl, test) {
   const lacStartY = doc.lastAutoTable.finalY + 8;
   const lacCanvas = document.getElementById('ch-lactate');
   const fcCanvas  = document.getElementById('ch-fc');
-  const maxLacH = H - 18 - lacStartY; // leave room for footer
+  const maxLacH = H - 26 - lacStartY; // leave room for footer
   const lacH = Math.min(lacCanvas ? Math.round(CW * lacCanvas.height / lacCanvas.width) : 80, maxLacH);
   const fcH  = Math.min(fcCanvas  ? Math.round(CW * fcCanvas.height  / fcCanvas.width)  : 80, 90);
 
@@ -1346,7 +1354,7 @@ async function buildPDF(cl, test) {
 
   doc.setFillColor(30,58,95);
   doc.rect(0, 0, W, 22, 'F');
-  if (logo) { try { const lf = logo.startsWith('data:image/jpeg')||logo.startsWith('data:image/jpg')?'JPEG':'PNG'; const{w:lW2,h:lH2}=await getImgDims(logo); const{w:lWmm2,h:lHmm2}=fitInBox(lW2,lH2,32,16); doc.addImage(logo,lf,M,(22-lHmm2)/2,lWmm2,lHmm2,'','FAST'); } catch{} }
+  if (logo) { try { doc.addImage(logo,logoFmt,M,(22-logoP2.h)/2,logoP2.w,logoP2.h,'','FAST'); } catch{} }
   doc.setTextColor(255,255,255);
   doc.setFontSize(13); doc.setFont(undefined,'bold');
   doc.text('ANALYSE & ZONES D\'INTENSITÉ', W/2, 10, {align:'center'});
@@ -1411,16 +1419,49 @@ async function buildPDF(cl, test) {
     `Les zones Z6–Z7 sont des zones de ${un === 'km/h' ? 'vitesse' : 'puissance'} anaérobie (pas de repère FC fiable).`,
   ].forEach((l, i) => doc.text(l, M, noteY + 5.5 + i*4.2));
 
-  // Footer
+  // ── Bandeau pied de page ──
   const total = doc.internal.getNumberOfPages();
+  const FH = 24;   // hauteur du bandeau en mm
+  const fy = H - FH;
   for (let i = 1; i <= total; i++) {
     doc.setPage(i);
-    doc.setDrawColor(226,232,240);
-    doc.line(M, H-11, W-M, H-11);
-    doc.setFontSize(6.5); doc.setTextColor(160,160,160);
-    doc.text('Généré par LactatePro', M, H-6.5);
-    doc.text(`Page ${i} / ${total}`, W/2, H-6.5, {align:'center'});
-    doc.text(new Date().toLocaleDateString('fr-FR'), W-M, H-6.5, {align:'right'});
+
+    // Fond gris très clair
+    doc.setFillColor(247, 249, 252);
+    doc.rect(0, fy, W, FH, 'F');
+
+    // Ligne de séparation haute
+    doc.setDrawColor(210, 218, 230);
+    doc.line(0, fy, W, fy);
+
+    // Logo (gauche, centré verticalement)
+    if (logo) {
+      try {
+        doc.addImage(logo, logoFmt, M, fy + (FH - logoFot.h) / 2, logoFot.w, logoFot.h, '', 'FAST');
+      } catch{}
+    }
+
+    // Séparateur vertical
+    const sepX = M + logoFot.w + 6;
+    doc.setDrawColor(200, 210, 225);
+    doc.line(sepX, fy + 4, sepX, H - 4);
+
+    // Coordonnées (alignées à droite)
+    const rx = W - M;
+    const ty = fy + 7;
+    doc.setTextColor(30, 58, 95);
+    doc.setFontSize(8.5); doc.setFont(undefined, 'bold');
+    doc.text('Maxime Chelda', rx, ty, { align: 'right' });
+
+    doc.setFont(undefined, 'normal');
+    doc.setFontSize(7.5); doc.setTextColor(80, 100, 125);
+    doc.text('Préparateur physique',    rx, ty + 4.5,  { align: 'right' });
+    doc.text('06 32 19 57 79',          rx, ty + 9,    { align: 'right' });
+    doc.text('maxime@ruthene-coachin.fr', rx, ty + 13.5, { align: 'right' });
+
+    // Numéro de page (entre logo et coordonnées)
+    doc.setFontSize(7); doc.setTextColor(160, 170, 185);
+    doc.text(`${i} / ${total}`, W / 2, fy + FH - 3, { align: 'center' });
   }
 
   const filename = `LactatePro_${cl.nom.replace(/\s+/g,'_')}_${test.date}.pdf`;
